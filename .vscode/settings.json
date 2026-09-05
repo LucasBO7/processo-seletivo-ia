@@ -1,0 +1,9 @@
+{
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "files.encoding": "utf8",
+  "files.eol": "\n",
+  "typescript.tsdk": "node_modules/typescript/lib"
+}

@@ -1,0 +1,270 @@
+:root {
+  color: #f7f7f2;
+  background: #090b09;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  background: #090b09;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.hero {
+  position: relative;
+  min-height: 680px;
+  overflow: hidden;
+  border-bottom: 1px solid #252a24;
+  background:
+    linear-gradient(120deg, rgba(118, 185, 0, 0.08), transparent 42%),
+    radial-gradient(circle at 88% 32%, rgba(118, 185, 0, 0.2), transparent 22%),
+    #090b09;
+}
+
+.hero::after {
+  position: absolute;
+  right: -8rem;
+  bottom: -15rem;
+  width: 42rem;
+  height: 42rem;
+  border: 1px solid rgba(118, 185, 0, 0.24);
+  border-radius: 50%;
+  content: '';
+}
+
+.hero__glow {
+  position: absolute;
+  top: 10rem;
+  right: 12%;
+  width: 9rem;
+  height: 9rem;
+  border: 1px solid rgba(170, 255, 0, 0.5);
+  transform: rotate(45deg);
+  box-shadow:
+    0 0 5rem rgba(118, 185, 0, 0.2),
+    inset 0 0 3rem rgba(118, 185, 0, 0.08);
+}
+
+.hero__nav,
+.hero__content,
+.scope {
+  width: min(1120px, calc(100% - 3rem));
+  margin-inline: auto;
+}
+
+.hero__nav {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding-block: 1.5rem;
+  color: #c9cec6;
+  font-size: 0.84rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.brand-mark {
+  display: grid;
+  width: 2.35rem;
+  height: 2.35rem;
+  place-items: center;
+  border-radius: 0.35rem;
+  color: #090b09;
+  background: #76b900;
+  font-weight: 850;
+}
+
+.status-pill {
+  margin-left: auto;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid #35402e;
+  border-radius: 999px;
+  color: #a8c878;
+  font-size: 0.7rem;
+}
+
+.hero__content {
+  position: relative;
+  z-index: 1;
+  padding-top: 8.5rem;
+}
+
+.hero__eyebrow,
+.section-heading p,
+.scope-card__eyebrow {
+  margin: 0 0 1rem;
+  color: #8bc926;
+  font-size: 0.76rem;
+  font-weight: 750;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.hero h1 {
+  max-width: 780px;
+  margin: 0;
+  font-size: clamp(3rem, 7vw, 6.3rem);
+  font-weight: 560;
+  letter-spacing: -0.065em;
+  line-height: 0.95;
+}
+
+.hero__summary {
+  max-width: 620px;
+  margin: 2rem 0;
+  color: #aeb5aa;
+  font-size: 1.12rem;
+  line-height: 1.7;
+}
+
+.hero__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid #76b900;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.hero__link:hover {
+  color: #a7eb36;
+}
+
+.scope {
+  padding-block: 6rem;
+}
+
+.section-heading {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 2rem;
+  align-items: start;
+  margin-bottom: 3rem;
+}
+
+.section-heading h2 {
+  max-width: 700px;
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3.6rem);
+  font-weight: 550;
+  letter-spacing: -0.045em;
+  line-height: 1.05;
+}
+
+.scope-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.scope-card {
+  min-height: 300px;
+  padding: 2rem;
+  border: 1px solid #292e27;
+  border-radius: 0.75rem;
+  background: #10130f;
+}
+
+.scope-card--current {
+  background: linear-gradient(145deg, rgba(118, 185, 0, 0.14), #10130f 55%);
+}
+
+.scope-card--future {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.04), #10130f 55%);
+}
+
+.scope-card h2 {
+  margin: 0 0 2rem;
+  font-size: 1.6rem;
+  font-weight: 600;
+}
+
+.scope-card ul {
+  display: grid;
+  gap: 0.9rem;
+  margin: 0;
+  padding: 0;
+  color: #b8beb5;
+  list-style: none;
+}
+
+.scope-card li {
+  display: flex;
+  gap: 0.75rem;
+  align-items: baseline;
+}
+
+.scope-card li::before {
+  color: #76b900;
+  content: '↗';
+}
+
+@media (max-width: 720px) {
+  .hero {
+    min-height: 640px;
+  }
+
+  .hero__glow {
+    top: 8rem;
+    right: -3rem;
+    opacity: 0.65;
+  }
+
+  .hero__content {
+    padding-top: 7rem;
+  }
+
+  .section-heading,
+  .scope-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .scope {
+    padding-block: 4rem;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .hero__glow {
+    animation: pulse 8s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%,
+    100% {
+      opacity: 0.6;
+      transform: rotate(45deg) scale(0.96);
+    }
+
+    50% {
+      opacity: 1;
+      transform: rotate(45deg) scale(1.04);
+    }
+  }
+}
