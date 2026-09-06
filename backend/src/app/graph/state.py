@@ -42,7 +42,7 @@ class RetrievedChunk(TypedDict):
     score: float
 
 
-class StartupRadarState(TypedDict, total=False):
+class AppState(TypedDict, total=False):
     run_id: UUID
     correlation_id: str
     query: str
@@ -64,8 +64,8 @@ class StartupRadarState(TypedDict, total=False):
     metrics: dict[str, float]
 
 
-def empty_state(*, run_id: UUID, correlation_id: str, query: str) -> StartupRadarState:
-    return StartupRadarState(
+def empty_state(*, run_id: UUID, correlation_id: str, query: str) -> AppState:
+    return AppState(
         run_id=run_id,
         correlation_id=correlation_id,
         query=query,

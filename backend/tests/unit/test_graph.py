@@ -7,7 +7,7 @@ from uuid import uuid4
 from app.domain.models import Evidence, SourceReference
 from app.graph.builder import create_graph_builder
 from app.graph.nodes import ALL_NODE_NAMES, NodeName
-from app.graph.state import StartupRadarState, empty_state
+from app.graph.state import AppState, empty_state
 
 
 def test_all_eight_node_names_are_centralized() -> None:
@@ -23,7 +23,7 @@ def test_state_accepts_partial_updates_and_traceable_evidence() -> None:
         title="Fonte",
     )
     state = empty_state(run_id=uuid4(), correlation_id="corr-1", query="fintechs")
-    update = StartupRadarState(validated_claims=[Evidence(claim="Usa IA", sources=(source,))])
+    update = AppState(validated_claims=[Evidence(claim="Usa IA", sources=(source,))])
     state.update(update)
 
     encoded = json.dumps(

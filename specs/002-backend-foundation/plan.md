@@ -22,7 +22,7 @@ backend/
 │   │   └── services/            # Casos de uso; sem regras dos agentes nesta feature
 │   ├── domain/                  # Entidades, evidências, citações e recomendações
 │   ├── graph/
-│   │   ├── state.py             # StartupRadarState tipado
+│   │   ├── state.py             # AppState tipado
 │   │   ├── nodes.py             # Identificadores dos oito agentes
 │   │   ├── contracts.py         # Contrato uniforme de nó
 │   │   └── builder.py           # Construção futura do StateGraph

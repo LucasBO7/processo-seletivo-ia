@@ -1,10 +1,10 @@
 from langgraph.graph import StateGraph
 
-from app.graph.state import StartupRadarState
+from app.graph.state import AppState
 
 
 def create_graph_builder() -> StateGraph[
-    StartupRadarState, None, StartupRadarState, StartupRadarState
+    AppState, None, AppState, AppState
 ]:
     """Create an empty builder; business nodes and edges require a future spec."""
-    return StateGraph(StartupRadarState)
+    return StateGraph(AppState)
