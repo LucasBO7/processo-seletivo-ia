@@ -253,8 +253,11 @@ entrega estão no [plano da fundação do backend](specs/002-backend-foundation/
 - npm 10 ou superior;
 - Python 3.12 ou superior;
 - [uv](https://docs.astral.sh/uv/) 0.11 ou superior;
-- Docker com suporte a Compose, somente para PostgreSQL e Qdrant locais;
+- acesso a uma instância PostgreSQL 16 e a uma instância Qdrant compatível;
 - VS Code opcional, para utilizar as extensões recomendadas do workspace.
+
+Docker não é um pré-requisito. O `compose.yaml` permanece disponível apenas
+como alternativa opcional para iniciar PostgreSQL e Qdrant localmente.
 
 ## 7. Instalação e execução
 
@@ -288,7 +291,12 @@ Crie a configuração local a partir do exemplo. O arquivo `backend/.env` é ign
 Copy-Item backend/.env.example backend/.env
 ```
 
-Inicie PostgreSQL 16 e Qdrant:
+Informe em `backend/.env` as URLs de instâncias PostgreSQL 16 e Qdrant que já
+estejam disponíveis. Elas podem ser serviços instalados diretamente na máquina,
+executados em outro host ou fornecidos por um ambiente remoto.
+
+Se preferir usar containers somente para essas dependências, o Compose é
+opcional:
 
 ```bash
 docker compose up -d
@@ -319,13 +327,14 @@ Recursos locais:
 - Swagger UI: `http://127.0.0.1:8000/api/v1/docs`;
 - contrato OpenAPI: `http://127.0.0.1:8000/api/v1/openapi.json`.
 
-Para encerrar apenas os serviços locais:
+Caso tenha escolhido a alternativa com Compose, encerre os serviços com:
 
 ```bash
 docker compose down
 ```
 
-Os volumes são preservados por padrão.
+Os volumes do Compose são preservados por padrão. Esse comando não se aplica a
+instâncias instaladas diretamente ou fornecidas externamente.
 
 ### 7.3. Variáveis do backend
 
@@ -367,6 +376,13 @@ Para os testes de integração, PostgreSQL e Qdrant devem estar ativos e as vari
 $env:RUN_INTEGRATION_TESTS = "1"
 uv run --project backend pytest -c backend/pyproject.toml backend/tests/integration
 ```
+
+A origem dos serviços não interfere nos testes: eles podem ser locais, externos
+ou, opcionalmente, iniciados pelo Compose.
+
+Na integração contínua, PostgreSQL e Qdrant continuam sendo executados como
+service containers isolados no runner do GitHub Actions. Essa decisão garante
+testes reproduzíveis e não exige Docker no ambiente local de desenvolvimento.
 
 Para atualizar uma dependência de forma consciente, altere sua restrição com `uv add --project backend <pacote>` e revise o diff de `backend/pyproject.toml` e `backend/uv.lock` antes de executar os testes.
 

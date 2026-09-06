@@ -7,6 +7,7 @@
 - Código deve ser simples e legível
 - Evitar overengineering
 - O código deve sempre utilizar boas práticas
+- No final de cada spec, colocar sempre uma sugestão de commit baseado no que foi/será realizado naquelas tarefas
 
 ## Fluxo obrigatório
 

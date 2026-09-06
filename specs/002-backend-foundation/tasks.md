@@ -20,7 +20,7 @@ As tarefas T-01 a T-33 foram implementadas e verificadas em 5 de setembro de
 
 ## Persistência
 
-- [x] **T-10 [US-05]** Adicionar Compose com PostgreSQL 16 e Qdrant, volumes nomeados e healthchecks para desenvolvimento e CI.
+- [x] **T-10 [US-01, US-05]** Permitir PostgreSQL e Qdrant fornecidos por URLs externas e manter Compose com volumes e healthchecks somente como alternativa local opcional.
 - [x] **T-11 [US-05, RF-05]** Configurar Alembic e criar a migração inicial de tabelas, restrições e índices.
 - [x] **T-12 [US-05, RF-06]** Definir contratos de repositório assíncronos na aplicação e implementações PostgreSQL na infraestrutura.
 - [x] **T-13 [US-05, RNF-09]** Implementar criação, injeção e encerramento ordenado do engine, pool e cliente Qdrant.
@@ -44,9 +44,9 @@ As tarefas T-01 a T-33 foram implementadas e verificadas em 5 de setembro de
 
 ## Integração contínua e documentação
 
-- [x] **T-25 [US-07]** Criar workflow de CI com PostgreSQL, Qdrant e verificações de backend e frontend.
+- [x] **T-25 [US-07]** Criar workflow de CI com service containers isolados de PostgreSQL e Qdrant, além das verificações de backend e frontend, sem impor Docker ao ambiente local.
 - [x] **T-26 [US-01, RNF-10]** Atualizar o README com arquitetura real, pré-requisitos, variáveis e comandos do backend.
-- [x] **T-27 [US-01, US-05]** Atualizar o registro da especificação 001 para explicar a reintrodução aprovada de Compose nesta etapa.
+- [x] **T-27 [US-01, US-05]** Atualizar o registro da especificação 001 para explicar a disponibilidade opcional de Compose nesta etapa.
 - [x] **T-28 [US-07]** Documentar como diagnosticar falhas de configuração, readiness e migração.
 
 ## Verificação final

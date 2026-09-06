@@ -27,6 +27,6 @@ Este registro não constitui recomendação para adoção futura. Cada item só 
 
 ## Evolução aprovada pela especificação 002
 
-Em 5 de setembro de 2026, a especificação `002-backend-foundation` aprovou a reintrodução de FastAPI, Pydantic, PostgreSQL, Qdrant, LangGraph, Ruff, mypy, pytest, pre-commit, integração contínua e Compose. A decisão não altera retroativamente o escopo da especificação 001; ela registra uma nova etapa, com critérios de aceite e validações próprios.
+Em 5 de setembro de 2026, a especificação `002-backend-foundation` aprovou a reintrodução de FastAPI, Pydantic, PostgreSQL, Qdrant, LangGraph, Ruff, mypy, pytest, pre-commit e integração contínua. Compose foi mantido apenas como alternativa opcional para fornecer PostgreSQL e Qdrant localmente; serviços externos ou instalados diretamente também são aceitos. A decisão não altera retroativamente o escopo da especificação 001; ela registra uma nova etapa, com critérios de aceite e validações próprios.
 
 Dockerfile e implantação da API continuam fora do escopo.

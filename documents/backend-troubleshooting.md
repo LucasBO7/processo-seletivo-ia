@@ -32,6 +32,12 @@ Invoke-WebRequest http://127.0.0.1:8000/health/live
 
 ```powershell
 Invoke-RestMethod http://127.0.0.1:8000/health/ready
+```
+
+Confira primeiro as URLs e a disponibilidade dos serviços configurados. Se
+você optou pelo Compose, também pode usar:
+
+```powershell
 docker compose ps
 docker compose logs postgres
 docker compose logs qdrant
@@ -58,7 +64,7 @@ Não use `Base.metadata.create_all()` para contornar migrações. Se o schema di
 
 ## Coleção Qdrant incompatível
 
-A aplicação rejeita uma coleção existente cuja dimensão ou distância divirja da configuração. Não altere esses valores em produção sem uma estratégia de reindexação. Para desenvolvimento descartável, remova o volume somente se os dados locais puderem ser perdidos e após confirmar o alvo da operação.
+A aplicação rejeita uma coleção existente cuja dimensão ou distância divirja da configuração. Não altere esses valores em produção sem uma estratégia de reindexação. Se estiver usando a alternativa com Compose em um ambiente descartável, remova o volume somente se os dados locais puderem ser perdidos e após confirmar o alvo da operação.
 
 ## Encerramento
 

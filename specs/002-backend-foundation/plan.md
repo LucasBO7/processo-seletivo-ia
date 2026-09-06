@@ -167,9 +167,16 @@ O cliente Cohere será encapsulado por um adaptador mínimo de reranking. SDKs c
 
 ## Ambiente local
 
-Um `compose.yaml` fornecerá PostgreSQL 16 e Qdrant, ambos com volumes nomeados e healthchecks. O backend poderá rodar no host para preservar reload rápido. Um Dockerfile da API não é necessário para o escopo desta fundação e só deverá ser criado quando houver uma estratégia de implantação.
+O backend roda diretamente no host e recebe as URLs de PostgreSQL e Qdrant por
+configuração. As duas dependências podem ser instaladas diretamente na máquina,
+executadas em outro host ou fornecidas por serviços externos compatíveis. A
+aplicação e os testes não devem distinguir a origem do serviço.
 
-A inclusão do Compose substitui, após aprovação desta spec, a decisão temporária da especificação 001 de não configurar contêineres. O README e o registro de decisões removidas deverão ser atualizados durante a implementação para deixar essa evolução explícita.
+O `compose.yaml` é mantido somente como conveniência opcional para iniciar
+PostgreSQL 16 e Qdrant localmente, com volumes nomeados e healthchecks. Docker
+não é pré-requisito do projeto, e a API não possui Dockerfile. A documentação
+deve apresentar primeiro a conexão por URLs e identificar claramente os comandos
+Compose como alternativa.
 
 ## Decisões
 
@@ -213,12 +220,20 @@ no Windows, enquanto o Psycopg assíncrono requer um selector loop. O entrypoint
 decisão fica na composition root, não altera o código de persistência e também
 funciona no subprocesso de reload.
 
+### D-10 — Containers apenas como opção local e infraestrutura da CI
+
+O Compose local permanece no repositório porque reduz o custo de reproduzir os
+testes de persistência, mas seu uso não é obrigatório. Na CI, os service containers
+de PostgreSQL e Qdrant são mantidos para oferecer integrações reais, efêmeras e
+determinísticas em cada execução. Essa escolha não transfere uma dependência de
+Docker para a máquina da pessoa desenvolvedora.
+
 ## Registro da implementação
 
 - Implementação técnica verificada em 5 de setembro de 2026.
-- PostgreSQL foi fixado em `16.10-alpine` e Qdrant em `v1.19.0`; a segunda versão
-  foi alinhada ao cliente Python resolvido no lockfile para evitar divergência
-  de protocolo durante os testes reais.
+- Para a alternativa Compose e para a CI, PostgreSQL foi fixado em
+  `16.10-alpine` e Qdrant em `v1.19.0`; serviços fornecidos externamente devem ser
+  compatíveis com os contratos e testes da aplicação.
 - A migration inicial foi validada nos ciclos `upgrade`, `downgrade base` e novo
   `upgrade`, incluindo os timestamps dos chunks usados pelos modelos ORM.
 - O escopo permaneceu restrito à fundação: nenhum prompt, chamada paga, lógica
@@ -227,7 +242,8 @@ funciona no subprocesso de reload.
 ## Verificação
 
 1. Criar o ambiente a partir do lockfile em um clone limpo.
-2. Subir PostgreSQL e Qdrant pelo Compose e aguardar os healthchecks.
+2. Disponibilizar PostgreSQL e Qdrant pelas URLs configuradas; opcionalmente,
+   iniciá-los pelo Compose e aguardar os healthchecks.
 3. Aplicar todas as migrações em banco vazio, inspecionar tabelas e índices, reverter a revisão e aplicá-la novamente.
 4. Iniciar a API e verificar liveness, readiness, OpenAPI, correlação, CORS e envelope de erro.
 5. Executar formatação em modo check, lint, mypy e testes unitários.
