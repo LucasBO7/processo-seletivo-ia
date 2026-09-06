@@ -151,11 +151,12 @@ de testes sem acessar a Groq.
 A associação por `NodeName` evita que cada agente escolha seu modelo e permite
 testar a arquitetura inteira em uma única matriz.
 
-### D-04 — Modelos default configuráveis
+### D-04 — Substitutos oficiais como defaults configuráveis
 
-Os IDs solicitados permanecem como defaults, porém não são constantes dentro
-dos agentes. A configuração permite substituí-los quando a conta não tiver
-permissão ou quando o provedor encerrar sua disponibilidade.
+Os modelos `openai/gpt-oss-20b` e `openai/gpt-oss-120b`, recomendados pela Groq
+para substituir os modelos Llama descontinuados, são os defaults, porém não são
+constantes dentro dos agentes. A configuração permite substituí-los quando a
+conta não tiver permissão ou quando o provedor encerrar sua disponibilidade.
 
 ### D-05 — Sem fallback implícito
 
@@ -187,7 +188,7 @@ rastro. Uma política de fallback exigirá especificação própria.
 
 ## Decisões adiadas
 
-- Modelos substitutos definitivos para contas sem acesso aos defaults.
+- Próxima migração de modelos quando os defaults forem descontinuados.
 - Fallback entre Groq e outro provedor.
 - Rate limiting interno, orçamento de tokens e circuit breaker.
 - Streaming, tool calling e recursos multimodais.

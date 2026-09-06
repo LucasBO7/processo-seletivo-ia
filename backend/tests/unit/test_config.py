@@ -25,6 +25,49 @@ def test_settings_parse_nested_values() -> None:
     assert settings.qdrant.embedding_dimension == 768
     assert settings.qdrant.distance == "dot"
     assert settings.reranker.provider == "cohere"
+    assert settings.llm_fast.model == "openai/gpt-oss-20b"
+    assert settings.llm_fast.temperature == 0
+    assert settings.llm_heavy.model == "openai/gpt-oss-120b"
+    assert settings.llm_heavy.temperature == 0.1
+
+
+def test_llm_profiles_parse_environment_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LLM_FAST__MODEL", "fast-override")
+    monkeypatch.setenv("LLM_FAST__TEMPERATURE", "0.25")
+    monkeypatch.setenv("LLM_FAST__TIMEOUT_SECONDS", "12")
+    monkeypatch.setenv("LLM_FAST__MAX_RETRIES", "1")
+    monkeypatch.setenv("LLM_HEAVY__MODEL", "heavy-override")
+
+    settings = Settings(
+        _env_file=None,
+        postgres={"url": "postgresql+psycopg://user:secret@localhost/database"},
+        qdrant={"url": "http://localhost:6333"},
+    )
+
+    assert settings.llm_fast.model == "fast-override"
+    assert settings.llm_fast.temperature == 0.25
+    assert settings.llm_fast.timeout_seconds == 12
+    assert settings.llm_fast.max_retries == 1
+    assert settings.llm_heavy.model == "heavy-override"
+
+
+@pytest.mark.parametrize(
+    ("profile", "value"),
+    [
+        ({"model": "", "temperature": 0}, "model"),
+        ({"model": "model", "temperature": -0.1}, "temperature"),
+        ({"model": "model", "temperature": 0, "timeout_seconds": 0}, "timeout"),
+        ({"model": "model", "temperature": 0, "max_retries": 11}, "max_retries"),
+    ],
+)
+def test_llm_profile_limits_are_validated(profile: dict[str, object], value: str) -> None:
+    with pytest.raises(ValidationError, match=value):
+        Settings(
+            _env_file=None,
+            postgres={"url": "postgresql+psycopg://user:secret@localhost/database"},
+            qdrant={"url": "http://localhost:6333"},
+            llm_fast=profile,
+        )
 
 
 def test_settings_require_postgres_and_qdrant() -> None:
@@ -52,8 +95,10 @@ def test_secret_values_are_redacted() -> None:
         _env_file=None,
         postgres={"url": "postgresql+psycopg://user:top-secret@localhost/database"},
         qdrant={"url": "http://localhost:6333", "api_key": "qdrant-secret"},
+        groq={"api_key": "groq-secret"},
     )
 
     representation = repr(settings)
     assert "top-secret" not in representation
     assert "qdrant-secret" not in representation
+    assert "groq-secret" not in representation

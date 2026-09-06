@@ -4,7 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal, Self
 
-from pydantic import BaseModel, Field, HttpUrl, SecretStr, model_validator
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_ROOT = Path(__file__).resolve().parents[3]
@@ -54,11 +54,27 @@ class ModelProviderConfig(BaseModel):
     max_retries: int = Field(default=2, ge=0, le=10)
 
 
+class GroqConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    api_key: SecretStr | None = None
+
+
+class LLMProfileConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    model: str = Field(min_length=1)
+    temperature: float = Field(ge=0, le=2)
+    timeout_seconds: float = Field(default=30.0, gt=0, le=300)
+    max_retries: int = Field(default=2, ge=0, le=10)
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=BACKEND_ROOT / ".env",
         env_file_encoding="utf-8",
         env_nested_delimiter="__",
+        nested_model_default_partial_update=True,
         extra="forbid",
         frozen=True,
     )
@@ -67,9 +83,9 @@ class Settings(BaseSettings):
     http: HttpConfig = Field(default_factory=HttpConfig)
     postgres: PostgresConfig
     qdrant: QdrantConfig
-    chat: ModelProviderConfig = Field(
-        default_factory=lambda: ModelProviderConfig(provider="unset", model="unset")
-    )
+    groq: GroqConfig = GroqConfig()
+    llm_fast: LLMProfileConfig = LLMProfileConfig(model="openai/gpt-oss-20b", temperature=0)
+    llm_heavy: LLMProfileConfig = LLMProfileConfig(model="openai/gpt-oss-120b", temperature=0.1)
     embeddings: ModelProviderConfig = Field(
         default_factory=lambda: ModelProviderConfig(provider="unset", model="unset")
     )

@@ -346,7 +346,9 @@ Todas as chaves aceitas e valores locais não sensíveis estão em `backend/.env
 | `HTTP__` | host, porta e allowlist CORS |
 | `POSTGRES__` | URL, pool e timeout do PostgreSQL |
 | `QDRANT__` | URL, coleção, dimensão, distância e timeout |
-| `CHAT__` | futuro modelo de chat |
+| `GROQ__` | credencial do provedor Groq |
+| `LLM_FAST__` | perfil rápido compartilhado pelos agentes |
+| `LLM_HEAVY__` | perfil pesado compartilhado pelos agentes |
 | `EMBEDDINGS__` | futuro modelo de embeddings |
 | `RERANKER__` | adaptador de reranking Cohere |
 

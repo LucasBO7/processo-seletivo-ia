@@ -17,6 +17,8 @@ forbidden_modules =
     sqlalchemy
     qdrant_client
     cohere
+    groq
+    langchain_groq
 
 [importlinter:contract:application-independence]
 name = Application must not depend on frameworks or adapters
@@ -30,3 +32,5 @@ forbidden_modules =
     sqlalchemy
     qdrant_client
     cohere
+    groq
+    langchain_groq

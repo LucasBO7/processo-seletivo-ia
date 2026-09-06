@@ -15,11 +15,13 @@ from app.api.routes.health import router as health_router
 from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging
 from app.core.resources import ApplicationResources
+from app.graph.model_policy import ModelProfile, ModelRegistry
 from app.infrastructure.persistence.database import (
     DatabaseReadinessProbe,
     create_engine,
     create_session_factory,
 )
+from app.infrastructure.providers.groq import create_groq_chat_model
 from app.infrastructure.vector.qdrant import (
     QdrantReadinessProbe,
     create_qdrant_client,
@@ -29,7 +31,23 @@ from app.infrastructure.vector.qdrant import (
 ResourceFactory = Callable[[Settings], Awaitable[ApplicationResources]]
 
 
+def create_model_registry(settings: Settings) -> ModelRegistry:
+    api_key = settings.groq.api_key.get_secret_value() if settings.groq.api_key else None
+    llm_fast = create_groq_chat_model(
+        config=settings.llm_fast,
+        api_key=api_key,
+        profile=ModelProfile.FAST,
+    )
+    llm_heavy = create_groq_chat_model(
+        config=settings.llm_heavy,
+        api_key=api_key,
+        profile=ModelProfile.HEAVY,
+    )
+    return ModelRegistry(llm_fast=llm_fast, llm_heavy=llm_heavy)
+
+
 async def create_resources(settings: Settings) -> ApplicationResources:
+    model_registry = create_model_registry(settings)
     engine = create_engine(settings.postgres)
     sessions = create_session_factory(engine)
     qdrant = create_qdrant_client(settings.qdrant)
@@ -45,6 +63,9 @@ async def create_resources(settings: Settings) -> ApplicationResources:
         qdrant=qdrant,
         postgres_probe=DatabaseReadinessProbe(engine),
         qdrant_probe=QdrantReadinessProbe(qdrant),
+        llm_fast=model_registry.llm_fast,
+        llm_heavy=model_registry.llm_heavy,
+        model_registry=model_registry,
     )
 
 
