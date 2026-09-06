@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16.10-alpine
+        env:
+          POSTGRES_DB: startup_radar
+          POSTGRES_USER: startup_radar
+          POSTGRES_PASSWORD: startup_radar
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U startup_radar -d startup_radar"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      qdrant:
+        image: qdrant/qdrant:v1.19.0
+        ports:
+          - 6333:6333
+
+    env:
+      APP__ENVIRONMENT: test
+      POSTGRES__URL: postgresql+psycopg://startup_radar:startup_radar@localhost:5432/startup_radar
+      QDRANT__URL: http://localhost:6333
+      QDRANT__COLLECTION_NAME: nvidia_knowledge_v1
+      QDRANT__EMBEDDING_DIMENSION: "4"
+      RUN_INTEGRATION_TESTS: "1"
+
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.11.28"
+          enable-cache: true
+      - name: Install Python and dependencies
+        run: uv sync --project backend --locked --all-groups
+      - name: Wait for Qdrant
+        run: curl -fsS --retry 20 --retry-connrefused --retry-delay 1 http://localhost:6333/readyz
+      - name: Check formatting
+        run: uv run --project backend ruff format --check backend/src backend/tests backend/migrations
+      - name: Lint
+        run: uv run --project backend ruff check backend/src backend/tests backend/migrations
+      - name: Type check
+        run: uv run --project backend mypy --config-file backend/pyproject.toml backend/src backend/tests
+      - name: Architecture contracts
+        run: uv run --project backend lint-imports --config backend/.importlinter
+      - name: Migrate up, down and up
+        run: |
+          uv run --project backend alembic -c backend/alembic.ini upgrade head
+          uv run --project backend alembic -c backend/alembic.ini downgrade base
+          uv run --project backend alembic -c backend/alembic.ini upgrade head
+      - name: Tests and coverage
+        run: >-
+          uv run --project backend pytest -c backend/pyproject.toml backend/tests
+          --cov=app --cov-report=term-missing --cov-fail-under=80
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20.19
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run test
+      - run: npm run build

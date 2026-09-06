@@ -1,0 +1,13 @@
+repos:
+  - repo: local
+    hooks:
+      - id: backend-check
+        name: backend quality checks
+        entry: uv run --project backend startup-radar-check
+        language: system
+        pass_filenames: false
+      - id: frontend-lint
+        name: frontend lint
+        entry: npm run lint
+        language: system
+        pass_filenames: false

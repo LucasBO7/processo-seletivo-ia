@@ -4,7 +4,7 @@ Plataforma idealizada para apoiar a NVIDIA na identificação, qualificação e 
 
 Desenvolvido por Lucas Bianchezzi Oliveira ([@LucasBO7](https://github.com/LucasBO7)).
 
-> Estado atual: documentação orientada por especificações e fundação do frontend. A arquitetura e a implementação do backend ainda serão definidas e não fazem parte deste scaffold.
+> Estado atual: fundações independentes do frontend e do backend. O backend fornece contratos, persistência, saúde e observabilidade, mas não implementa a lógica dos agentes nem expõe uma rota de análise.
 
 ## 1. Contexto
 
@@ -175,44 +175,90 @@ Esta fundação inclui:
 - especificações SDD do estágio atual;
 - frontend React com TypeScript e Vite;
 - uma página inicial que comunica o estado e os limites do projeto;
-- configurações de desenvolvimento compatíveis com o escopo aprovado;
-- documentação das decisões técnicas adiadas ou removidas.
+- backend Python 3.12 com FastAPI, contratos LangGraph e arquitetura modular;
+- PostgreSQL 16, migrações Alembic, Qdrant e fronteira BM25;
+- endpoints de liveness e readiness, correlação, CORS e logs JSON;
+- testes unitários, arquiteturais e de integração, qualidade estática e CI;
+- documentação das decisões técnicas e operacionais.
 
 Não estão incluídos neste estágio:
 
-- arquitetura ou implementação do backend;
-- agentes LangGraph/LangChain executáveis;
-- endpoints FastAPI;
-- schema, migrations ou conexão com PostgreSQL;
-- Docker ou Docker Compose;
+- lógica ou prompts dos agentes LangGraph/LangChain;
+- grafo funcional compilado ou rota de análise;
+- ingestão de conteúdo, embeddings ou chamadas reais a provedores de IA;
+- autenticação, implantação ou Dockerfile da API;
 - scraping ou ingestão automática de fontes externas.
 
 ## 5. Organização do repositório
 
+### 5.1. Estrutura atual
+
 ```text
 .
-├── .vscode/                       # Extensões e preferências recomendadas
-├── documents/                     # TAPI, diagramas originais e decisões removidas
-├── specs/001-project-foundation/  # Especificação, plano e tarefas SDD
-├── src/
-│   ├── components/                # Componentes visuais reutilizáveis
-│   ├── pages/                     # Páginas da aplicação
-│   ├── styles/                    # Estilos globais
-│   └── test/                      # Configuração dos testes do frontend
+├── .vscode/                       # Configurações do ambiente de desenvolvimento
+├── documents/                     # TAPI, diagramas e decisões arquiteturais
+├── specs/
+│   ├── 001-project-foundation/ # Fundação do frontend, aprovada e implementada
+│   └── 002-backend-foundation/ # Fundação do backend implementada
+├── backend/
+│   ├── migrations/             # Schema PostgreSQL versionado
+│   ├── src/app/                # API, aplicação, domínio, grafo e infraestrutura
+│   └── tests/                  # Testes unitários, arquiteturais e de integração
+├── src/                           # Frontend React existente
+│   ├── components/
+│   ├── pages/
+│   ├── styles/
+│   └── test/
 ├── index.html
 ├── package.json
 └── vite.config.ts
 ```
 
+### 5.2. Arquitetura do backend
+
+A especificação 002 implementa um monólito modular. A organização abaixo
+preserva os oito agentes do pipeline e separa regras de negócio, orquestração e
+integrações externas:
+
+```text
+backend/
+├── pyproject.toml, uv.lock          # Projeto Python reproduzível
+├── migrations/                    # Schema PostgreSQL versionado
+├── scripts/                       # Orientação para operações futuras
+├── src/app/
+│   ├── api/                      # FastAPI, health, middleware e erros
+│   ├── application/              # Casos de uso e portas internas
+│   ├── domain/                   # Entidades, evidências e recomendações
+│   ├── graph/
+│   │   ├── state.py              # Estado compartilhado do LangGraph
+│   │   ├── nodes.py              # Identificadores dos oito agentes
+│   │   ├── contracts.py          # Contrato uniforme dos nós
+│   │   ├── builder.py            # Montagem do grafo
+│   ├── infrastructure/          # PostgreSQL, Qdrant, BM25 e provedores
+│   ├── core/                    # Configuração, logging e ciclo de vida
+│   └── main.py                  # Composição e entrada da API
+└── tests/                         # Testes unitários, de integração e arquitetura
+```
+
+Os futuros `query_planner`, `retriever`, `extractor`, `classifier`, `validator`,
+`nvidia_rag`, `recommender` e `briefing` ficam conceitualmente em `graph/agents`.
+As antigas `db_tools` e `rag_tools` são divididas entre contratos de
+`application` e adaptadores de `infrastructure`, evitando que os agentes dependam
+diretamente de SQL ou SDKs. A estrutura detalhada e os limites desta primeira
+entrega estão no [plano da fundação do backend](specs/002-backend-foundation/plan.md).
+
 ## 6. Pré-requisitos
 
 - Node.js 20.19 ou superior;
 - npm 10 ou superior;
+- Python 3.12 ou superior;
+- [uv](https://docs.astral.sh/uv/) 0.11 ou superior;
+- Docker com suporte a Compose, somente para PostgreSQL e Qdrant locais;
 - VS Code opcional, para utilizar as extensões recomendadas do workspace.
 
-Python, FastAPI, LangGraph, LangChain e PostgreSQL fazem parte da stack prevista pelo TAPI, mas não são instalados nem configurados nesta etapa.
-
 ## 7. Instalação e execução
+
+### 7.1. Frontend
 
 Na raiz do repositório:
 
@@ -223,7 +269,7 @@ npm run dev
 
 O Vite exibirá no terminal o endereço local da aplicação, normalmente `http://localhost:5173`.
 
-### Comandos disponíveis
+Comandos disponíveis:
 
 ```bash
 npm run dev        # inicia o servidor de desenvolvimento
@@ -233,6 +279,106 @@ npm run test:watch # executa os testes em modo interativo
 npm run build      # valida tipos e gera a versão de produção
 npm run preview    # serve localmente o build de produção
 ```
+
+### 7.2. Backend
+
+Crie a configuração local a partir do exemplo. O arquivo `backend/.env` é ignorado pelo Git:
+
+```powershell
+Copy-Item backend/.env.example backend/.env
+```
+
+Inicie PostgreSQL 16 e Qdrant:
+
+```bash
+docker compose up -d
+docker compose ps
+```
+
+Instale exatamente as dependências registradas no lockfile e aplique as migrações:
+
+```bash
+uv sync --project backend --locked --all-groups
+uv run --project backend alembic -c backend/alembic.ini upgrade head
+```
+
+Inicie a API:
+
+```bash
+uv run --project backend startup-radar
+```
+
+No Windows, use esse entrypoint em vez de chamar `uvicorn` diretamente: ele
+seleciona o event loop compatível com o Psycopg assíncrono. O reload continua
+habilitado quando `APP__ENVIRONMENT=local`.
+
+Recursos locais:
+
+- liveness: `http://127.0.0.1:8000/health/live`;
+- readiness: `http://127.0.0.1:8000/health/ready`;
+- Swagger UI: `http://127.0.0.1:8000/api/v1/docs`;
+- contrato OpenAPI: `http://127.0.0.1:8000/api/v1/openapi.json`.
+
+Para encerrar apenas os serviços locais:
+
+```bash
+docker compose down
+```
+
+Os volumes são preservados por padrão.
+
+### 7.3. Variáveis do backend
+
+Todas as chaves aceitas e valores locais não sensíveis estão em `backend/.env.example`. Os principais grupos são:
+
+| Prefixo | Responsabilidade |
+| --- | --- |
+| `APP__` | ambiente e nível de log |
+| `HTTP__` | host, porta e allowlist CORS |
+| `POSTGRES__` | URL, pool e timeout do PostgreSQL |
+| `QDRANT__` | URL, coleção, dimensão, distância e timeout |
+| `CHAT__` | futuro modelo de chat |
+| `EMBEDDINGS__` | futuro modelo de embeddings |
+| `RERANKER__` | adaptador de reranking Cohere |
+
+Use dois sublinhados para separar grupo e campo. Chaves reais são opcionais nesta fundação e nunca devem ser adicionadas ao `.env.example` ou aos logs.
+
+### 7.4. Qualidade e testes do backend
+
+Execute cada verificação separadamente:
+
+```bash
+uv run --project backend ruff format --check backend/src backend/tests backend/migrations
+uv run --project backend ruff check backend/src backend/tests backend/migrations
+uv run --project backend mypy --config-file backend/pyproject.toml backend/src backend/tests
+uv run --project backend lint-imports --config backend/.importlinter
+uv run --project backend pytest -c backend/pyproject.toml backend/tests -m "not integration"
+```
+
+Ou execute a verificação local agregada:
+
+```bash
+uv run --project backend startup-radar-check
+```
+
+Para os testes de integração, PostgreSQL e Qdrant devem estar ativos e as variáveis de `backend/.env` disponíveis no ambiente:
+
+```powershell
+$env:RUN_INTEGRATION_TESTS = "1"
+uv run --project backend pytest -c backend/pyproject.toml backend/tests/integration
+```
+
+Para atualizar uma dependência de forma consciente, altere sua restrição com `uv add --project backend <pacote>` e revise o diff de `backend/pyproject.toml` e `backend/uv.lock` antes de executar os testes.
+
+### 7.5. Migrações
+
+```bash
+uv run --project backend alembic -c backend/alembic.ini current
+uv run --project backend alembic -c backend/alembic.ini upgrade head
+uv run --project backend alembic -c backend/alembic.ini downgrade -1
+```
+
+O schema nunca deve ser criado automaticamente na inicialização da API. Consulte [diagnóstico do backend](documents/backend-troubleshooting.md) em caso de falha de configuração, readiness, migração ou coleção vetorial.
 
 ## 8. Desenvolvimento orientado por especificações
 
@@ -244,7 +390,7 @@ Cada mudança deve responder, nesta ordem, a três perguntas:
 2. **Como será construído?** — `plan.md`.
 3. **Em quais passos verificáveis?** — `tasks.md`.
 
-A especificação desta fundação em [specs/001-project-foundation](specs/001-project-foundation/) funciona como exemplo completo.
+A fundação mais recente em [specs/002-backend-foundation](specs/002-backend-foundation/) funciona como exemplo completo.
 
 ### 8.1. Criar uma especificação
 
@@ -252,7 +398,7 @@ Escolha o próximo número sequencial e um nome curto em `kebab-case`. Por exemp
 
 ```text
 specs/
-└── 002-startup-search/
+└── 003-startup-search/
     ├── spec.md
     ├── plan.md
     └── tasks.md
@@ -261,7 +407,7 @@ specs/
 No PowerShell, a pasta pode ser criada com:
 
 ```powershell
-New-Item -ItemType Directory -Path "specs/002-startup-search"
+New-Item -ItemType Directory -Path "specs/003-startup-search"
 ```
 
 Não reutilize um número e não misture funcionalidades independentes na mesma pasta.
@@ -271,7 +417,7 @@ Não reutilize um número e não misture funcionalidades independentes na mesma 
 Comece pela necessidade e pelos resultados observáveis, sem decidir detalhes de implementação prematuramente.
 
 ```markdown
-# Especificação 002: busca de startups
+# Especificação 003: busca de startups
 
 ## Status
 
@@ -314,9 +460,9 @@ Critérios de aceite:
 
 ## Matriz de rastreabilidade
 
-| História | Requisitos | Validação |
-| --- | --- | --- |
-| US-01 | RF-01, RNF-01 | Teste ou inspeção correspondente |
+| História | Requisitos    | Validação                        |
+| -------- | ------------- | -------------------------------- |
+| US-01    | RF-01, RNF-01 | Teste ou inspeção correspondente |
 ```
 
 Uma especificação está pronta para revisão quando:
@@ -344,7 +490,7 @@ Não inicie a implementação enquanto a especificação estiver como `Proposta`
 Com a especificação aprovada, documente a solução técnica e relacione cada decisão aos requisitos.
 
 ```markdown
-# Plano 002: busca de startups
+# Plano 003: busca de startups
 
 ## Estratégia
 
@@ -366,8 +512,8 @@ Explique a escolha, as alternativas consideradas e as consequências.
 
 ## Riscos e mitigação
 
-| Risco | Mitigação |
-| --- | --- |
+| Risco              | Mitigação            |
+| ------------------ | -------------------- |
 | Risco identificado | Tratamento planejado |
 ```
 
@@ -378,7 +524,7 @@ O plano deve respeitar todo item marcado como fora do escopo. Caso a solução e
 Transforme o plano em tarefas pequenas, ordenadas e verificáveis. Cada tarefa deve apontar para pelo menos uma história ou requisito.
 
 ```markdown
-# Tarefas 002: busca de startups
+# Tarefas 003: busca de startups
 
 ## Implementação
 
@@ -461,4 +607,4 @@ As alternativas retiradas do escopo desta fundação estão registradas em [docu
 
 ## 9. Próxima etapa
 
-A arquitetura do backend será idealizada separadamente. Quando ela for aprovada, deverá receber sua própria especificação SDD antes da criação de módulos, agentes, banco de dados ou contratos de API.
+A lógica dos oito agentes, a ingestão de dados, o fluxo funcional completo e a integração com o frontend continuam exigindo especificações próprias. Cada nova etapa deve reutilizar as portas e os modelos da fundação sem acoplar domínio a FastAPI, SQLAlchemy, Qdrant ou SDKs externos.

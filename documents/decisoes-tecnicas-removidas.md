@@ -2,7 +2,7 @@
 
 ## Status
 
-Registro histórico. Os itens deste documento **não estão aprovados, instalados ou configurados** no projeto atual.
+Registro histórico da especificação 001. Alguns itens foram posteriormente reavaliados e aprovados pela especificação 002; a tabela abaixo preserva o motivo da remoção original, sem representar o estado técnico atual.
 
 Durante o planejamento inicial, algumas ferramentas e estruturas foram consideradas para antecipar a implementação completa. Após a revisão de escopo, a arquitetura de backend foi reservada para uma ideação futura do responsável pelo projeto e todo uso de Docker foi descartado desta etapa.
 
@@ -24,3 +24,9 @@ Durante o planejamento inicial, algumas ferramentas e estruturas foram considera
 ## Possível reavaliação
 
 Este registro não constitui recomendação para adoção futura. Cada item só poderá retornar ao projeto por meio de uma nova especificação SDD, com justificativa, alternativas, impactos e critérios de aceite próprios.
+
+## Evolução aprovada pela especificação 002
+
+Em 5 de setembro de 2026, a especificação `002-backend-foundation` aprovou a reintrodução de FastAPI, Pydantic, PostgreSQL, Qdrant, LangGraph, Ruff, mypy, pytest, pre-commit, integração contínua e Compose. A decisão não altera retroativamente o escopo da especificação 001; ela registra uma nova etapa, com critérios de aceite e validações próprios.
+
+Dockerfile e implantação da API continuam fora do escopo.

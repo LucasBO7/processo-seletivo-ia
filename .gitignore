@@ -1,6 +1,16 @@
 node_modules/
+.npm-cache/
 dist/
 coverage/
+backend/.venv/
+backend/.env
+backend/.pytest_cache/
+backend/.mypy_cache/
+backend/.ruff_cache/
+backend/.coverage
+.coverage
+__pycache__/
+*.py[cod]
 *.local
 *.log
 .DS_Store

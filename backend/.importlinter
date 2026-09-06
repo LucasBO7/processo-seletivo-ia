@@ -1,0 +1,32 @@
+[importlinter]
+root_package = app
+include_external_packages = True
+
+[importlinter:contract:domain-independence]
+name = Domain must not depend on outer layers
+type = forbidden
+source_modules =
+    app.domain
+forbidden_modules =
+    app.api
+    app.application
+    app.graph
+    app.infrastructure
+    app.core
+    fastapi
+    sqlalchemy
+    qdrant_client
+    cohere
+
+[importlinter:contract:application-independence]
+name = Application must not depend on frameworks or adapters
+type = forbidden
+source_modules =
+    app.application
+forbidden_modules =
+    app.api
+    app.infrastructure
+    fastapi
+    sqlalchemy
+    qdrant_client
+    cohere

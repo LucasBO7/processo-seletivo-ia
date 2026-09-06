@@ -1,0 +1,1 @@
+"""Armazenamento vetorial Qdrant."""

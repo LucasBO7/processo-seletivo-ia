@@ -40,6 +40,8 @@ Os testes verificam apenas conteúdo e comportamento do frontend. Não serão cr
 
 Não serão adicionados Dockerfile, Compose, imagens, volumes ou instruções relacionadas a Docker.
 
+> Evolução posterior: esta decisão era válida para a fundação do frontend. A especificação 002, aprovada em 5 de setembro de 2026, reintroduziu apenas Compose para PostgreSQL e Qdrant no ambiente de desenvolvimento e CI. Dockerfile e implantação continuam fora do escopo.
+
 ## Verificação
 
 1. Instalar dependências com npm.
