@@ -11,7 +11,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.errors import ErrorResponse
 from app.api.middleware import correlation_and_logging_middleware
-from app.api.routes.health import router as health_router
+from app.api.routes.query_plans import router as query_plans_router
 from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging
 from app.core.resources import ApplicationResources
@@ -105,7 +105,7 @@ def create_app(
         CORSMiddleware,
         allow_origins=resolved_settings.http.cors_origins,
         allow_credentials=resolved_settings.http.cors_allow_credentials,
-        allow_methods=["GET", "OPTIONS"],
+        allow_methods=["POST", "OPTIONS"],
         allow_headers=["Accept", "Content-Type", "X-Correlation-ID"],
         expose_headers=["X-Correlation-ID"],
     )
@@ -141,5 +141,5 @@ def create_app(
             message="Ocorreu um erro interno.",
         )
 
-    app.include_router(health_router)
+    app.include_router(query_plans_router)
     return app

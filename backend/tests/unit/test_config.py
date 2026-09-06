@@ -29,6 +29,56 @@ def test_settings_parse_nested_values() -> None:
     assert settings.llm_fast.temperature == 0
     assert settings.llm_heavy.model == "openai/gpt-oss-120b"
     assert settings.llm_heavy.temperature == 0.1
+    assert settings.query_planner.max_query_length == 2_000
+    assert settings.query_planner.max_repair_attempts == 1
+    assert settings.retriever.max_results == 20
+    assert settings.retriever.excerpt_length == 300
+
+
+def test_retriever_limits_parse_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("RETRIEVER__MAX_RESULTS", "10")
+    monkeypatch.setenv("RETRIEVER__EXCERPT_LENGTH", "500")
+    settings = Settings(
+        _env_file=None,
+        postgres={"url": "postgresql+psycopg://user:secret@localhost/database"},
+        qdrant={"url": "http://localhost:6333"},
+    )
+
+    assert settings.retriever.max_results == 10
+    assert settings.retriever.excerpt_length == 500
+
+
+def test_query_planner_limits_parse_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("QUERY_PLANNER__MAX_QUERY_LENGTH", "500")
+    monkeypatch.setenv("QUERY_PLANNER__MAX_ITEMS_PER_LIST", "10")
+    settings = Settings(
+        _env_file=None,
+        postgres={"url": "postgresql+psycopg://user:secret@localhost/database"},
+        qdrant={"url": "http://localhost:6333"},
+    )
+
+    assert settings.query_planner.max_query_length == 500
+    assert settings.query_planner.max_items_per_list == 10
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("max_query_length", 2_001),
+        ("max_items_per_list", 21),
+        ("max_clarification_questions", 4),
+        ("max_rationale_length", 501),
+        ("max_repair_attempts", 2),
+    ],
+)
+def test_query_planner_limits_reject_values_above_contract(field: str, value: int) -> None:
+    with pytest.raises(ValidationError, match=field):
+        Settings(
+            _env_file=None,
+            postgres={"url": "postgresql+psycopg://user:secret@localhost/database"},
+            qdrant={"url": "http://localhost:6333"},
+            query_planner={field: value},
+        )
 
 
 def test_llm_profiles_parse_environment_overrides(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -2,10 +2,12 @@
 
 ## Status
 
-Proposta.
+Implementada e verificada em 6 de setembro de 2026; aguardando aprovação
+explícita da entrega para conclusão.
 
-Esta especificação deve ser revisada e aprovada explicitamente antes do início
-da implementação.
+A implementação foi autorizada em 6 de setembro de 2026 por solicitação
+explícita do responsável pelo projeto. As tarefas T-01 a T-18 foram executadas;
+a T-19 permanece aberta até a validação da entrega.
 
 ## Contexto
 
@@ -233,6 +235,11 @@ vocabulários controlados pertence à especificação do Retriever Agent.
 - O nó não pode executar tarefas pertencentes aos demais sete agentes.
 
 ## Fora do escopo
+
+> Evolução: a especificação 005 passou a expor o agente por
+> `POST /api/v1/query-plans`. A restrição de rota abaixo permanece como registro
+> do escopo original desta entrega. A especificação 006 implementou o Retriever
+> posteriormente, sem alterar o contrato aprovado do Query Planner.
 
 - Implementar o Retriever Agent ou consultar startups.
 - Definir a taxonomia definitiva de setores, portes, estágios ou regiões.

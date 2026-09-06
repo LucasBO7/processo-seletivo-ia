@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import and_, case, false, func, literal, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.sql.elements import ColumnElement
 
+from app.application.contracts.retrieval import RankedStartup, StartupSearchCriteria
 from app.domain.models import (
     AnalysisRun,
     AnalysisStatus,
@@ -36,6 +38,64 @@ class SqlAlchemyStartupRepository:
             row = await session.get(StartupRow, startup_id)
         return _startup_from_row(row) if row else None
 
+    async def search(self, criteria: StartupSearchCriteria, *, limit: int) -> list[RankedStartup]:
+        conditions: list[ColumnElement[bool]] = []
+        if criteria.sectors:
+            conditions.append(func.lower(StartupRow.sector).in_(criteria.sectors))
+        if criteria.stages:
+            conditions.append(func.lower(StartupRow.stage).in_(criteria.stages))
+        if criteria.locations:
+            conditions.append(func.lower(StartupRow.location).in_(criteria.locations))
+        if criteria.requires_team_size_match:
+            size_conditions = [
+                and_(
+                    StartupRow.team_size >= item.minimum,
+                    true_if_unbounded_or_maximum(item.maximum),
+                )
+                for item in criteria.team_size_ranges
+            ]
+            conditions.append(or_(*size_conditions) if size_conditions else false())
+
+        score: ColumnElement[float] = literal(float(criteria.structured_filter_count))
+        text_matches: list[ColumnElement[bool]] = []
+        for term in criteria.text_terms:
+            startup_match = or_(
+                func.lower(func.coalesce(StartupRow.name, "")).contains(term),
+                func.lower(func.coalesce(StartupRow.sector, "")).contains(term),
+                func.lower(func.coalesce(StartupRow.stage, "")).contains(term),
+                func.lower(func.coalesce(StartupRow.location, "")).contains(term),
+                func.lower(func.coalesce(StartupRow.short_description, "")).contains(term),
+            )
+            document_match = (
+                select(StartupDocumentRow.id)
+                .where(
+                    StartupDocumentRow.startup_id == StartupRow.id,
+                    or_(
+                        func.lower(StartupDocumentRow.title).contains(term),
+                        func.lower(StartupDocumentRow.content_text).contains(term),
+                    ),
+                )
+                .exists()
+            )
+            text_match = or_(startup_match, document_match)
+            text_matches.append(text_match)
+            score += case((text_match, 1.0), else_=0.0)
+        if text_matches:
+            conditions.append(or_(*text_matches))
+
+        statement = (
+            select(StartupRow, score.label("relevance_score"))
+            .where(*conditions)
+            .order_by(score.desc(), func.lower(StartupRow.name), StartupRow.id)
+            .limit(limit)
+        )
+        async with self._sessions() as session:
+            rows = (await session.execute(statement)).all()
+        return [
+            RankedStartup(startup=_startup_from_row(row), score=float(relevance_score))
+            for row, relevance_score in rows
+        ]
+
 
 class SqlAlchemyStartupDocumentRepository:
     def __init__(self, sessions: async_sessionmaker[AsyncSession]) -> None:
@@ -51,6 +111,29 @@ class SqlAlchemyStartupDocumentRepository:
         async with self._sessions() as session:
             rows = (await session.scalars(statement)).all()
         return [_startup_document_from_row(row) for row in rows]
+
+    async def list_for_startups(self, startup_ids: list[UUID]) -> list[StartupDocument]:
+        if not startup_ids:
+            return []
+        statement = (
+            select(StartupDocumentRow)
+            .where(StartupDocumentRow.startup_id.in_(startup_ids))
+            .order_by(
+                StartupDocumentRow.startup_id,
+                StartupDocumentRow.published_at.desc().nullslast(),
+                func.lower(StartupDocumentRow.title),
+                StartupDocumentRow.id,
+            )
+        )
+        async with self._sessions() as session:
+            rows = (await session.scalars(statement)).all()
+        return [_startup_document_from_row(row) for row in rows]
+
+
+def true_if_unbounded_or_maximum(maximum: int | None) -> ColumnElement[bool]:
+    if maximum is None:
+        return literal(True)
+    return StartupRow.team_size <= maximum
 
 
 class SqlAlchemyAnalysisRunRepository:

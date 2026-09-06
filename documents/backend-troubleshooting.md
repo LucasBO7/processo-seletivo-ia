@@ -1,6 +1,6 @@
 # Diagnóstico do backend
 
-Este guia cobre falhas da fundação definida na especificação 002. Ele não inclui lógica de agentes ou provedores de IA.
+Este guia cobre falhas da fundação e da API do Query Planner.
 
 ## Configuração inválida na inicialização
 
@@ -18,24 +18,10 @@ Verificações:
 4. Não coloque aspas extras em URLs.
 5. Nunca publique o conteúdo do `.env` em issues ou logs.
 
-## Liveness falha
+## Aplicação não inicia
 
-`GET /health/live` não consulta dependências. Se falhar, verifique se o processo está ativo, se a porta configurada está livre e se a aplicação terminou sua inicialização.
-
-```powershell
-Invoke-WebRequest http://127.0.0.1:8000/health/live
-```
-
-## Readiness retorna HTTP 503
-
-`GET /health/ready` consulta PostgreSQL e Qdrant. O corpo identifica qual dependência não respondeu.
-
-```powershell
-Invoke-RestMethod http://127.0.0.1:8000/health/ready
-```
-
-Confira primeiro as URLs e a disponibilidade dos serviços configurados. Se
-você optou pelo Compose, também pode usar:
+Confirme se a porta configurada está livre e se PostgreSQL e Qdrant estão
+disponíveis nas URLs do ambiente. Se você optou pelo Compose, use:
 
 ```powershell
 docker compose ps
@@ -52,7 +38,7 @@ seletor compatível também durante o reload local.
 
 ## Migração falha
 
-Confirme primeiro a readiness dos serviços e a configuração do ambiente. Depois consulte o estado do Alembic:
+Confirme primeiro a disponibilidade dos serviços e a configuração do ambiente. Depois consulte o estado do Alembic:
 
 ```powershell
 uv run --project backend alembic -c backend/alembic.ini current

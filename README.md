@@ -4,7 +4,7 @@ Plataforma idealizada para apoiar a NVIDIA na identificação, qualificação e 
 
 Desenvolvido por Lucas Bianchezzi Oliveira ([@LucasBO7](https://github.com/LucasBO7)).
 
-> Estado atual: fundações independentes do frontend e do backend. O backend fornece contratos, persistência, saúde e observabilidade, mas não implementa a lógica dos agentes nem expõe uma rota de análise.
+> Estado atual: fundações independentes do frontend e do backend. O backend fornece contratos, persistência, saúde, observabilidade e o Query Planner Agent; ainda não expõe uma rota de análise nem executa o pipeline completo.
 
 ## 1. Contexto
 
@@ -177,7 +177,8 @@ Esta fundação inclui:
 - uma página inicial que comunica o estado e os limites do projeto;
 - backend Python 3.12 com FastAPI, contratos LangGraph e arquitetura modular;
 - PostgreSQL 16, migrações Alembic, Qdrant e fronteira BM25;
-- endpoints de liveness e readiness, correlação, CORS e logs JSON;
+- API versionada do Query Planner, correlação, CORS e logs JSON;
+- Query Planner assíncrono com saída estruturada, validação e reparo limitado;
 - testes unitários, arquiteturais e de integração, qualidade estática e CI;
 - documentação das decisões técnicas e operacionais.
 
@@ -240,8 +241,9 @@ backend/
 └── tests/                         # Testes unitários, de integração e arquitetura
 ```
 
-Os futuros `query_planner`, `retriever`, `extractor`, `classifier`, `validator`,
-`nvidia_rag`, `recommender` e `briefing` ficam conceitualmente em `graph/agents`.
+O `query_planner` e o `retriever` ficam em `graph/agents`; os futuros `extractor`,
+`classifier`, `validator`, `nvidia_rag`, `recommender` e `briefing` serão
+adicionados por suas próprias especificações.
 As antigas `db_tools` e `rag_tools` são divididas entre contratos de
 `application` e adaptadores de `infrastructure`, evitando que os agentes dependam
 diretamente de SQL ou SDKs. A estrutura detalhada e os limites desta primeira
@@ -322,8 +324,7 @@ habilitado quando `APP__ENVIRONMENT=local`.
 
 Recursos locais:
 
-- liveness: `http://127.0.0.1:8000/health/live`;
-- readiness: `http://127.0.0.1:8000/health/ready`;
+- Query Planner: `POST http://127.0.0.1:8000/api/v1/query-plans`;
 - Swagger UI: `http://127.0.0.1:8000/api/v1/docs`;
 - contrato OpenAPI: `http://127.0.0.1:8000/api/v1/openapi.json`.
 
@@ -349,12 +350,73 @@ Todas as chaves aceitas e valores locais não sensíveis estão em `backend/.env
 | `GROQ__` | credencial do provedor Groq |
 | `LLM_FAST__` | perfil rápido compartilhado pelos agentes |
 | `LLM_HEAVY__` | perfil pesado compartilhado pelos agentes |
+| `QUERY_PLANNER__` | limites de consulta, listas, perguntas, justificativa e reparo |
+| `RETRIEVER__` | limite de startups retornadas e tamanho do trecho de evidência |
 | `EMBEDDINGS__` | futuro modelo de embeddings |
 | `RERANKER__` | adaptador de reranking Cohere |
 
 Use dois sublinhados para separar grupo e campo. Chaves reais são opcionais nesta fundação e nunca devem ser adicionadas ao `.env.example` ou aos logs.
 
-### 7.4. Qualidade e testes do backend
+### 7.4. Query Planner
+
+O primeiro nó funcional recebe `AppState.query` e retorna uma atualização parcial
+com um `QueryPlan` validado. O contrato separa setor, porte, estágio, localização,
+palavras-chave e sinais de IA, além de definir uma estratégia `targeted`,
+`exploratory` ou `comparative`.
+
+Os status possíveis são:
+
+- `ready`: plano consumível por um futuro Retriever;
+- `needs_clarification`: há ambiguidade material e perguntas curtas para resolvê-la;
+- `invalid`: a solicitação não pertence à descoberta ou análise de startups.
+
+Por padrão, consultas aceitam até 2.000 caracteres, cada lista até 20 itens, o
+plano até três perguntas de esclarecimento, justificativas até 500 caracteres e
+uma tentativa de reparo estrutural. Os testes usam modelos falsos e não chamam a
+Groq, banco de dados ou internet. A rota atual não executa o Retriever nem as
+transições do grafo completo.
+
+Para testar no Postman, selecione o método `POST`, use a URL
+`http://127.0.0.1:8000/api/v1/query-plans`, configure o header
+`Content-Type: application/json` e envie:
+
+```json
+{
+  "query": "Startups brasileiras de saúde em estágio seed usando visão computacional"
+}
+```
+
+O frontend pode usar o mesmo contrato:
+
+```typescript
+const response = await fetch("http://127.0.0.1:8000/api/v1/query-plans", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ query }),
+});
+
+const result = await response.json();
+```
+
+Respostas `ready`, `needs_clarification` e `invalid` usam HTTP 200. Entrada
+inválida usa 422, saída inválida do modelo usa 502 e indisponibilidade da Groq
+usa 503. As antigas rotas `/health/live` e `/health/ready` não são mais expostas.
+
+### 7.5. Retriever
+
+O Retriever consome internamente somente planos `ready`, aplica no PostgreSQL os
+filtros de setor, porte, estágio e localização e usa palavras-chave e sinais de
+IA para pontuar correspondências nos dados e documentos das startups. Os
+resultados são ordenados por score, nome e UUID. Documentos são carregados em
+lote e preservam UUID, URL, título e trecho em `selected_sources`.
+
+O limite padrão é 20 startups e o trecho padrão possui 300 caracteres,
+configuráveis por `RETRIEVER__MAX_RESULTS` e `RETRIEVER__EXCERPT_LENGTH`. Busca
+sem correspondência produz listas vazias e `retriever_no_results`. Esta feature
+não adiciona rota HTTP nem conecta o grafo completo; esse encadeamento pertence
+a uma evolução posterior da API.
+
+### 7.6. Qualidade e testes do backend
 
 Execute cada verificação separadamente:
 
@@ -388,7 +450,7 @@ testes reproduzíveis e não exige Docker no ambiente local de desenvolvimento.
 
 Para atualizar uma dependência de forma consciente, altere sua restrição com `uv add --project backend <pacote>` e revise o diff de `backend/pyproject.toml` e `backend/uv.lock` antes de executar os testes.
 
-### 7.5. Migrações
+### 7.7. Migrações
 
 ```bash
 uv run --project backend alembic -c backend/alembic.ini current
@@ -396,7 +458,7 @@ uv run --project backend alembic -c backend/alembic.ini upgrade head
 uv run --project backend alembic -c backend/alembic.ini downgrade -1
 ```
 
-O schema nunca deve ser criado automaticamente na inicialização da API. Consulte [diagnóstico do backend](documents/backend-troubleshooting.md) em caso de falha de configuração, readiness, migração ou coleção vetorial.
+O schema nunca deve ser criado automaticamente na inicialização da API. Consulte [diagnóstico do backend](documents/backend-troubleshooting.md) em caso de falha de configuração, migração ou coleção vetorial.
 
 ## 8. Desenvolvimento orientado por especificações
 

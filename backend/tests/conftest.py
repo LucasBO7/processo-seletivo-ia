@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import sys
 from collections.abc import Iterator
 from typing import cast
@@ -9,25 +10,37 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.api.app import create_app
+from app.application.ports.providers import ChatModel
 from app.core.config import Settings
 from app.core.resources import ApplicationResources
+from app.graph.model_policy import ModelRegistry
+from tests.fakes.providers import FakeChatModel
 
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 
-class StubProbe:
-    def __init__(self, ready: bool = True) -> None:
-        self.ready = ready
-
-    async def check(self) -> bool:
-        return self.ready
-
-
 class StubResources:
-    def __init__(self, *, postgres_ready: bool = True, qdrant_ready: bool = True) -> None:
-        self.postgres_probe = StubProbe(postgres_ready)
-        self.qdrant_probe = StubProbe(qdrant_ready)
+    def __init__(self, model: ChatModel | None = None) -> None:
+        default_response = json.dumps(
+            {
+                "status": "ready",
+                "normalized_query": "startups",
+                "filters": {},
+                "analysis_strategy": {
+                    "mode": "exploratory",
+                    "objectives": ["descobrir startups"],
+                    "rationale": "Consulta ampla e executável.",
+                },
+                "ambiguities": [],
+                "clarification_questions": [],
+            }
+        )
+        self.chat_model = model or FakeChatModel(default_response)
+        self.model_registry = ModelRegistry(
+            llm_fast=self.chat_model,
+            llm_heavy=self.chat_model,
+        )
         self.closed = False
 
     async def close(self) -> None:

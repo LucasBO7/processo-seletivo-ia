@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, TypedDict
 from uuid import UUID
 
+from app.application.contracts.query_plan import QueryPlan
 from app.domain.models import (
     AIMaturity,
     Evidence,
@@ -46,6 +47,7 @@ class AppState(TypedDict, total=False):
     run_id: UUID
     correlation_id: str
     query: str
+    query_plan: QueryPlan
     filters: dict[str, Any]
     candidate_startups: list[CandidateStartup]
     selected_sources: list[SourceReference]

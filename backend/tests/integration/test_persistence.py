@@ -7,6 +7,7 @@ import pytest
 from qdrant_client import models
 from sqlalchemy import inspect
 
+from app.application.contracts.retrieval import StartupSearchCriteria
 from app.core.config import Settings
 from app.domain.models import KnowledgeChunk, KnowledgeDocument, Startup, StartupDocument
 from app.infrastructure.persistence.database import create_engine, create_session_factory
@@ -49,18 +50,47 @@ async def test_schema_repositories_and_qdrant_are_consistent() -> None:
         chunk_repository = SqlAlchemyKnowledgeChunkRepository(sessions)
 
         suffix = uuid4().hex
-        startup = Startup(name=f"Startup {suffix}")
+        startup = Startup(
+            name=f"Startup {suffix}",
+            sector=f"Sector {suffix}",
+            stage="Seed",
+            location="Brasil",
+            team_size=25,
+        )
         await startup_repository.add(startup)
         evidence = StartupDocument(
             startup_id=startup.id,
             document_type="site",
             title="Página oficial",
-            content_text="Evidência pública da startup.",
+            content_text=f"Evidência pública da startup com sinal {suffix}.",
             source_url=f"https://example.com/{suffix}",
         )
         await startup_document_repository.add(evidence)
         assert (await startup_repository.get(startup.id)) == startup
         assert (await startup_document_repository.list_for_startup(startup.id))[0] == evidence
+        ranked = await startup_repository.search(
+            StartupSearchCriteria(
+                sectors=(f"sector {suffix}",),
+                stages=("seed",),
+                locations=("brasil",),
+                text_terms=(suffix,),
+            ),
+            limit=5,
+        )
+        assert ranked[0].startup.id == startup.id
+        assert ranked[0].score == 4.0
+        assert (await startup_document_repository.list_for_startups([startup.id]))[0] == evidence
+
+        async with engine.connect() as connection:
+            startup_indexes = await connection.run_sync(
+                lambda sync: {item["name"] for item in inspect(sync).get_indexes("startups")}
+            )
+        assert {
+            "ix_startups_sector_lower",
+            "ix_startups_stage_lower",
+            "ix_startups_location_lower",
+            "ix_startups_team_size",
+        } <= startup_indexes
 
         knowledge = KnowledgeDocument(
             title="NVIDIA NIM",

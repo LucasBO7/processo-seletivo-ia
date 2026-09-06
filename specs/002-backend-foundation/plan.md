@@ -157,6 +157,10 @@ O cliente Cohere será encapsulado por um adaptador mínimo de reranking. SDKs c
 
 ## API e operação
 
+> Evolução: a especificação 005 remove as duas rotas de saúde descritas abaixo e
+> publica a primeira rota funcional versionada. Esta seção preserva a decisão
+> original da fundação como histórico.
+
 - `GET /health/live` confirma apenas que o processo atende requisições.
 - `GET /health/ready` verifica PostgreSQL e Qdrant sem chamar provedores pagos.
 - Rotas funcionais futuras ficam sob `/api/v1`; não será criado endpoint fictício de análise.

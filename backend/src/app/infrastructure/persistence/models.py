@@ -50,6 +50,10 @@ class StartupRow(TimestampMixin, Base):
     __table_args__ = (
         CheckConstraint("founded_year IS NULL OR founded_year >= 1800", name="ck_startup_year"),
         CheckConstraint("team_size IS NULL OR team_size >= 0", name="ck_startup_team_size"),
+        Index("ix_startups_sector_lower", func.lower(sector)),
+        Index("ix_startups_stage_lower", func.lower(stage)),
+        Index("ix_startups_location_lower", func.lower(location)),
+        Index("ix_startups_team_size", "team_size"),
     )
 
 

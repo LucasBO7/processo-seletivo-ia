@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Protocol
 from uuid import UUID
 
+from app.application.contracts.retrieval import RankedStartup, StartupSearchCriteria
 from app.domain.models import (
     AnalysisRun,
     KnowledgeChunk,
@@ -17,11 +18,17 @@ class StartupRepository(Protocol):
 
     async def get(self, startup_id: UUID) -> Startup | None: ...
 
+    async def search(
+        self, criteria: StartupSearchCriteria, *, limit: int
+    ) -> list[RankedStartup]: ...
+
 
 class StartupDocumentRepository(Protocol):
     async def add(self, document: StartupDocument) -> StartupDocument: ...
 
     async def list_for_startup(self, startup_id: UUID) -> list[StartupDocument]: ...
+
+    async def list_for_startups(self, startup_ids: list[UUID]) -> list[StartupDocument]: ...
 
 
 class AnalysisRunRepository(Protocol):

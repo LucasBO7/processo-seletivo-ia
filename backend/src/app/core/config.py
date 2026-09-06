@@ -69,6 +69,23 @@ class LLMProfileConfig(BaseModel):
     max_retries: int = Field(default=2, ge=0, le=10)
 
 
+class QueryPlannerConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    max_query_length: int = Field(default=2_000, ge=1, le=2_000)
+    max_items_per_list: int = Field(default=20, ge=1, le=20)
+    max_clarification_questions: int = Field(default=3, ge=1, le=3)
+    max_rationale_length: int = Field(default=500, ge=1, le=500)
+    max_repair_attempts: int = Field(default=1, ge=0, le=1)
+
+
+class RetrieverConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    max_results: int = Field(default=20, ge=1, le=100)
+    excerpt_length: int = Field(default=300, ge=50, le=2_000)
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=BACKEND_ROOT / ".env",
@@ -86,6 +103,8 @@ class Settings(BaseSettings):
     groq: GroqConfig = GroqConfig()
     llm_fast: LLMProfileConfig = LLMProfileConfig(model="openai/gpt-oss-20b", temperature=0)
     llm_heavy: LLMProfileConfig = LLMProfileConfig(model="openai/gpt-oss-120b", temperature=0.1)
+    query_planner: QueryPlannerConfig = QueryPlannerConfig()
+    retriever: RetrieverConfig = RetrieverConfig()
     embeddings: ModelProviderConfig = Field(
         default_factory=lambda: ModelProviderConfig(provider="unset", model="unset")
     )

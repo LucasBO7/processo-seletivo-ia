@@ -4,6 +4,10 @@
 
 Aguardando aprovação da entrega.
 
+> Evolução: a especificação 005 substitui RF-02 e RNF-03 e remove os endpoints
+> públicos de liveness e readiness por decisão explícita. Os registros abaixo
+> permanecem como histórico dos critérios da fundação.
+
 A aprovação foi registrada pela solicitação explícita de início da execução das tarefas.
 As tarefas T-01 a T-33 foram implementadas e verificadas em 5 de setembro de
 2026. Conforme T-34, o status só será alterado para `Concluída` após a validação

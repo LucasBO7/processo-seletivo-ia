@@ -15,6 +15,19 @@ class FakeChatModel:
         return self.response
 
 
+class SequenceChatModel:
+    def __init__(self, responses: list[str | Exception]) -> None:
+        self.responses = responses
+        self.calls: list[Sequence[ChatMessage]] = []
+
+    async def complete(self, messages: Sequence[ChatMessage]) -> str:
+        self.calls.append(messages)
+        response = self.responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response
+
+
 class FakeEmbeddingModel:
     def __init__(self, dimension: int = 3) -> None:
         self.dimension = dimension

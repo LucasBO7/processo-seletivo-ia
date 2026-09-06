@@ -41,10 +41,10 @@ def test_application_does_not_import_frameworks_or_infrastructure() -> None:
         assert "app.infrastructure" not in path.read_text(encoding="utf-8")
 
 
-def test_graph_state_and_agents_do_not_import_groq_sdk() -> None:
+def test_graph_state_and_agents_do_not_import_provider_or_database_sdks() -> None:
     paths = [SOURCE_ROOT / "graph" / "state.py"]
     agents = SOURCE_ROOT / "graph" / "agents"
     if agents.exists():
         paths.extend(agents.rglob("*.py"))
     imports = set().union(*(imported_roots(path) for path in paths))
-    assert imports.isdisjoint({"groq", "langchain_groq"})
+    assert imports.isdisjoint({"groq", "langchain_groq", "sqlalchemy", "psycopg"})
