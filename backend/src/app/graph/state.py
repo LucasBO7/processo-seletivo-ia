@@ -4,10 +4,15 @@ from typing import Any, TypedDict
 from uuid import UUID
 
 from app.application.contracts.classification import StartupClassification
+from app.application.contracts.evidence_validation import (
+    ClaimValidation,
+    ClassificationValidation,
+    ValidatedClassification,
+    ValidatedStartupProfile,
+)
 from app.application.contracts.extraction import StructuredStartupProfile
 from app.application.contracts.query_plan import QueryPlan
 from app.domain.models import (
-    Evidence,
     Recommendation,
     RecoverableError,
     SourceReference,
@@ -39,8 +44,14 @@ class AppState(TypedDict, total=False):
     selected_sources: list[SourceReference]
     structured_profiles: list[StructuredStartupProfile]
     classifications: list[StartupClassification]
-    validated_claims: list[Evidence]
-    rejected_claims: list[Evidence]
+    validated_profiles: list[ValidatedStartupProfile]
+    validated_classifications: list[ValidatedClassification]
+    claim_validations: list[ClaimValidation]
+    classification_validations: list[ClassificationValidation]
+    validated_claims: list[ClaimValidation]
+    rejected_claims: list[ClaimValidation]
+    conflicting_claims: list[ClaimValidation]
+    evidence_gaps: list[ClaimValidation]
     technical_gaps: list[TechnicalGap]
     retrieval_query: str
     candidate_chunks: list[RetrievedChunk]
@@ -62,8 +73,14 @@ def empty_state(*, run_id: UUID, correlation_id: str, query: str) -> AppState:
         selected_sources=[],
         structured_profiles=[],
         classifications=[],
+        validated_profiles=[],
+        validated_classifications=[],
+        claim_validations=[],
+        classification_validations=[],
         validated_claims=[],
         rejected_claims=[],
+        conflicting_claims=[],
+        evidence_gaps=[],
         technical_gaps=[],
         candidate_chunks=[],
         reranked_chunks=[],

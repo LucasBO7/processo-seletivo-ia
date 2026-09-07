@@ -15,7 +15,18 @@ from app.application.contracts.classification import (
     ConfidenceLevel,
     StartupClassification,
 )
-from app.application.contracts.extraction import StructuredStartupProfile
+from app.application.contracts.evidence_validation import (
+    ClaimValidation,
+    EvidenceStatus,
+    SourceAssessment,
+    SourceVerdict,
+    ValidatedStartupProfile,
+)
+from app.application.contracts.extraction import (
+    ExtractionSource,
+    ProfileField,
+    StructuredStartupProfile,
+)
 from app.application.contracts.query_plan import QueryPlan
 from app.application.ports.providers import ChatModel, ChatModelError, ChatModelErrorCode
 from app.core.config import Settings
@@ -161,6 +172,28 @@ def test_correlation_id_is_propagated(client: TestClient) -> None:
 def test_search_returns_workflow_plan_candidates_and_sources(settings: Settings) -> None:
     startup_id = uuid4()
     source_id = uuid4()
+    source_pointer = ExtractionSource(
+        startup_id=startup_id,
+        source_id=source_id,
+        source_url="https://example.com/source",
+    )
+    claim_validation = ClaimValidation(
+        startup_id=startup_id,
+        claim_key="claims[0]",
+        field=ProfileField.CLAIMS,
+        value="Public evidence",
+        status=EvidenceStatus.SUPPORTED,
+        justification="The excerpt supports the claim.",
+        original_sources=[source_pointer],
+        analyzed_sources=[
+            SourceAssessment(
+                startup_id=startup_id,
+                source_id=source_id,
+                source_url="https://example.com/source",
+                verdict=SourceVerdict.SUPPORTS,
+            )
+        ],
+    )
     workflow = StubWorkflow(
         AppState(
             query_plan=QueryPlan.model_validate_json(plan_response()),
@@ -202,6 +235,15 @@ def test_search_returns_workflow_plan_candidates_and_sources(settings: Settings)
                     confidence=ConfidenceLevel.LOW,
                 )
             ],
+            validated_profiles=[
+                ValidatedStartupProfile(
+                    startup_id=startup_id,
+                    name="Startup One",
+                    unknown_fields=list(ProfileField),
+                )
+            ],
+            claim_validations=[claim_validation],
+            validated_claims=[claim_validation],
             warnings=[],
             errors=[],
             metrics={"query_planner_duration_ms": 1.0, "retriever_duration_ms": 2.0},
@@ -226,6 +268,15 @@ def test_search_returns_workflow_plan_candidates_and_sources(settings: Settings)
     assert body["structured_profiles"][0]["name"] == "Startup One"
     assert body["classifications"][0]["status"] == "uncertain"
     assert body["classifications"][0]["category"] is None
+    assert body["validated_profiles"][0]["startup_id"] == str(startup_id)
+    assert body["claim_validations"][0]["status"] == "supported"
+    assert body["claim_validations"][0]["analyzed_sources"][0]["source_url"] == (
+        "https://example.com/source"
+    )
+    assert body["validated_claims"] == body["claim_validations"]
+    assert body["rejected_claims"] == []
+    assert body["conflicting_claims"] == []
+    assert body["evidence_gaps"] == []
     assert workflow.calls[0]["correlation_id"] == "search-123"
     assert workflow.calls[0]["query"] == "startups"
 
@@ -352,6 +403,24 @@ def test_search_treats_empty_retrieval_as_success(settings: Settings) -> None:
     assert response.json()["warnings"] == ["retriever_no_results"]
 
 
+def test_search_treats_no_supported_claims_as_success(settings: Settings) -> None:
+    workflow = StubWorkflow(
+        AppState(
+            validated_profiles=[],
+            validated_claims=[],
+            warnings=["validator_no_supported_claims"],
+            errors=[],
+        )
+    )
+
+    with client_with_workflow(settings, workflow) as client:
+        response = client.post("/api/v1/search", json={"query": "startups"})
+
+    assert response.status_code == 200
+    assert response.json()["validated_claims"] == []
+    assert response.json()["warnings"] == ["validator_no_supported_claims"]
+
+
 @pytest.mark.parametrize(
     ("code", "expected_status"),
     [
@@ -364,6 +433,8 @@ def test_search_treats_empty_retrieval_as_success(settings: Settings) -> None:
         ("extractor_unavailable", 503),
         ("classifier_invalid_output", 502),
         ("classifier_unavailable", 503),
+        ("evidence_validator_invalid_output", 502),
+        ("evidence_validator_unavailable", 503),
     ],
 )
 def test_search_maps_recoverable_errors(
@@ -427,6 +498,12 @@ def test_openapi_exposes_current_functional_routes(client: TestClient) -> None:
     assert "ClassificationStatus" in schemas
     assert "ConfidenceLevel" in schemas
     assert "ClassificationSignalType" in schemas
+    assert "ValidatedStartupProfile" in schemas
+    assert "ValidatedClassification" in schemas
+    assert "ClaimValidation" in schemas
+    assert "ClassificationValidation" in schemas
+    assert "EvidenceStatus" in schemas
+    assert "SourceVerdict" in schemas
 
 
 @pytest.mark.parametrize("path", ["/health/live", "/health/ready"])

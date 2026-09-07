@@ -21,6 +21,11 @@
 
 - Priorizar cobertura dos critérios de aceitação
 - Testes devem ser claros e diretos
+- Nunca chamar LLM real em testes automatizados; usar `FakeChatModel`,
+  `SequenceChatModel` ou cliente de adaptador falso
+- Manter consultas, documentos e respostas falsas no menor tamanho necessário
+  para o critério testado
+- Serializar payloads de prompt sem espaços opcionais para reduzir tokens
 
 ## Restrições
 

@@ -363,3 +363,9 @@ API, passar todas as verificações e receber aprovação explícita da entrega.
 ## Sugestão de commit
 
 `feat(classifier): classify structured startup profiles from evidence`
+
+## Evolução posterior
+
+A especificação 011 substitui o encerramento direto pelo Evidence Validator. Os
+perfis e classificações originais permanecem para auditoria, enquanto agentes
+posteriores passam a consumir somente as coleções `validated_*`.

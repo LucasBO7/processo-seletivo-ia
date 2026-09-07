@@ -24,6 +24,7 @@ class ApplicationResources:
     query_planner: GraphNode
     extractor: GraphNode
     startup_classifier: GraphNode
+    evidence_validator: GraphNode
     workflow: AnalysisWorkflow
 
     async def close(self) -> None:

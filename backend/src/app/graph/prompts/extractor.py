@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import json
-
 from app.application.contracts.extraction import ExtractorOutput
 from app.domain.models import SourceReference
+from app.graph.prompts.json_format import compact_json
 
 PROMPT_VERSION = "extractor-v1"
 
@@ -31,12 +30,9 @@ def build_messages(*, startup_name: str, sources: list[SourceReference]) -> tupl
         "their names in unknown_fields. Technical needs must be explicit claims "
         "from a document, not recommendations. Do not classify AI maturity, "
         "validate claims, or recommend products or technologies. Return JSON only, "
-        f"strictly matching this schema: {json.dumps(schema, ensure_ascii=False)}"
+        f"strictly matching this schema: {compact_json(schema)}"
     )
-    user_prompt = json.dumps(
-        {"startup_name": startup_name, "documents": documents},
-        ensure_ascii=False,
-    )
+    user_prompt = compact_json({"startup_name": startup_name, "documents": documents})
     return system_prompt, user_prompt
 
 
@@ -49,7 +45,7 @@ def build_repair_message(candidate: str, *, sources: list[SourceReference]) -> s
         }
         for source in sources
     ]
-    return json.dumps(
+    return compact_json(
         {
             "instruction": (
                 "Repair the candidate into valid JSON matching the requested schema. "
@@ -59,5 +55,4 @@ def build_repair_message(candidate: str, *, sources: list[SourceReference]) -> s
             "allowed_sources": allowed_sources,
             "invalid_candidate": candidate,
         },
-        ensure_ascii=False,
     )

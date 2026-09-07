@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-
 from app.application.contracts.filter_taxonomy import (
     COMPANY_SIZE_ALIASES,
     SECTOR_ALIASES,
@@ -9,6 +7,7 @@ from app.application.contracts.filter_taxonomy import (
     STAGE_ALIASES,
 )
 from app.application.contracts.query_plan import QueryPlan
+from app.graph.prompts.json_format import compact_json
 
 PROMPT_VERSION = "query-planner-v2"
 
@@ -40,8 +39,8 @@ candidate. Return JSON only.
 
 
 def build_messages(query: str) -> tuple[str, str]:
-    schema = json.dumps(QueryPlan.model_json_schema(), ensure_ascii=False)
-    taxonomy = json.dumps(
+    schema = compact_json(QueryPlan.model_json_schema())
+    taxonomy = compact_json(
         {
             "sectors": {
                 sector.value: {
@@ -55,7 +54,6 @@ def build_messages(query: str) -> tuple[str, str]:
                 size.value: COMPANY_SIZE_ALIASES[size] for size in COMPANY_SIZE_ALIASES
             },
         },
-        ensure_ascii=False,
     )
     system = SYSTEM_PROMPT.format(schema=schema, taxonomy=taxonomy)
     user = f"<untrusted_query>{query}</untrusted_query>"

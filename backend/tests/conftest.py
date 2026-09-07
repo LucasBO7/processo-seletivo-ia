@@ -23,6 +23,16 @@ if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 
+@pytest.fixture(autouse=True)
+def block_live_llm_clients(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make accidental paid/network LLM use fail before a client is created."""
+
+    def blocked_client(**_: object) -> None:
+        raise AssertionError("Live LLM clients are forbidden in automated tests.")
+
+    monkeypatch.setattr("app.infrastructure.providers.groq.ChatGroq", blocked_client)
+
+
 class StubWorkflow:
     def __init__(self, result: AppState | None = None) -> None:
         self.result = result
@@ -78,6 +88,7 @@ class StubResources:
         )
         self.extractor = None
         self.startup_classifier = None
+        self.evidence_validator = None
         self.workflow = workflow or StubWorkflow()
         self.closed = False
 

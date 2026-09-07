@@ -39,6 +39,9 @@ def test_settings_parse_nested_values() -> None:
     assert settings.startup_classifier.max_sources_per_startup == 10
     assert settings.startup_classifier.max_context_characters == 12_000
     assert settings.startup_classifier.max_repair_attempts == 1
+    assert settings.evidence_validator.max_sources_per_startup == 10
+    assert settings.evidence_validator.max_items_per_startup == 250
+    assert settings.evidence_validator.max_repair_attempts == 1
 
 
 def test_retriever_limits_parse_environment(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -78,6 +81,21 @@ def test_classifier_limits_parse_environment(monkeypatch: pytest.MonkeyPatch) ->
 
     assert settings.startup_classifier.max_signals == 7
     assert settings.startup_classifier.max_justification_length == 700
+
+
+def test_evidence_validator_limits_parse_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("EVIDENCE_VALIDATOR__MAX_ITEMS_PER_STARTUP", "100")
+    monkeypatch.setenv("EVIDENCE_VALIDATOR__MAX_CONTEXT_CHARACTERS", "9000")
+    settings = Settings(
+        _env_file=None,
+        postgres={"url": "postgresql+psycopg://user:secret@localhost/database"},
+        qdrant={"url": "http://localhost:6333"},
+    )
+
+    assert settings.evidence_validator.max_items_per_startup == 100
+    assert settings.evidence_validator.max_context_characters == 9_000
 
 
 def test_query_planner_limits_parse_environment(monkeypatch: pytest.MonkeyPatch) -> None:

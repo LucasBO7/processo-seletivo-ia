@@ -12,6 +12,7 @@ from app.graph.state import AppState
 RouteAfterPlanner = Literal["retrieve", "stop"]
 RouteAfterRetriever = Literal["extract", "stop"]
 RouteAfterExtractor = Literal["classify", "stop"]
+RouteAfterClassifier = Literal["validate", "stop"]
 BLOCKING_PLANNER_ERRORS = {
     "query_empty",
     "query_too_long",
@@ -50,18 +51,25 @@ def route_after_extractor(state: AppState) -> RouteAfterExtractor:
     return "classify" if state.get("structured_profiles") else "stop"
 
 
+def route_after_classifier(state: AppState) -> RouteAfterClassifier:
+    """Validate evidence whenever at least one structured profile exists."""
+    return "validate" if state.get("structured_profiles") else "stop"
+
+
 def create_graph_builder(
     *,
     query_planner: GraphNode,
     retriever: GraphNode,
     extractor: GraphNode,
     startup_classifier: GraphNode,
+    evidence_validator: GraphNode,
 ) -> StateGraph[AppState, None, AppState, AppState]:
     builder = StateGraph(AppState)
     builder.add_node(NodeName.QUERY_PLANNER.value, query_planner)
     builder.add_node(NodeName.RETRIEVER.value, retriever)
     builder.add_node(NodeName.EXTRACTOR.value, extractor)
     builder.add_node(NodeName.STARTUP_CLASSIFIER.value, startup_classifier)
+    builder.add_node(NodeName.EVIDENCE_VALIDATOR.value, evidence_validator)
     builder.add_edge(START, NodeName.QUERY_PLANNER.value)
     builder.add_conditional_edges(
         NodeName.QUERY_PLANNER.value,
@@ -78,7 +86,12 @@ def create_graph_builder(
         route_after_extractor,
         {"classify": NodeName.STARTUP_CLASSIFIER.value, "stop": END},
     )
-    builder.add_edge(NodeName.STARTUP_CLASSIFIER.value, END)
+    builder.add_conditional_edges(
+        NodeName.STARTUP_CLASSIFIER.value,
+        route_after_classifier,
+        {"validate": NodeName.EVIDENCE_VALIDATOR.value, "stop": END},
+    )
+    builder.add_edge(NodeName.EVIDENCE_VALIDATOR.value, END)
     return builder
 
 
@@ -88,11 +101,13 @@ def compile_analysis_workflow(
     retriever: GraphNode,
     extractor: GraphNode,
     startup_classifier: GraphNode,
+    evidence_validator: GraphNode,
 ) -> AnalysisWorkflow:
     workflow = create_graph_builder(
         query_planner=query_planner,
         retriever=retriever,
         extractor=extractor,
         startup_classifier=startup_classifier,
+        evidence_validator=evidence_validator,
     ).compile()
     return cast(AnalysisWorkflow, workflow)

@@ -11,6 +11,7 @@ from sqlalchemy import inspect
 from app.application.contracts.retrieval import StartupSearchCriteria
 from app.core.config import Settings
 from app.domain.models import KnowledgeChunk, KnowledgeDocument, Startup, StartupDocument
+from app.graph.agents.evidence_validator import EvidenceValidatorAgent
 from app.graph.agents.extractor import ExtractorAgent
 from app.graph.agents.query_planner import create_query_planner_agent
 from app.graph.agents.retriever import RetrieverAgent
@@ -196,6 +197,33 @@ async def test_schema_repositories_and_qdrant_are_consistent() -> None:
                 ),
                 config=settings.startup_classifier,
             ),
+            evidence_validator=EvidenceValidatorAgent(
+                model=SequenceChatModel(
+                    [
+                        json.dumps(
+                            {
+                                "assessments": [
+                                    {
+                                        "claim_key": "claims[0]",
+                                        "status": "supported",
+                                        "justification": "The excerpt contains the claim.",
+                                        "analyzed_sources": [
+                                            {
+                                                "startup_id": str(document.startup_id),
+                                                "source_id": str(document.id),
+                                                "source_url": document.source_url,
+                                                "verdict": "supports",
+                                            }
+                                        ],
+                                    }
+                                ]
+                            }
+                        )
+                        for document in (financial_management_evidence, evidence)
+                    ]
+                ),
+                config=settings.evidence_validator,
+            ),
         )
         workflow_result = await workflow.ainvoke(
             empty_state(
@@ -232,6 +260,14 @@ async def test_schema_repositories_and_qdrant_are_consistent() -> None:
             classification.status.value == "uncertain"
             for classification in workflow_result["classifications"]
         )
+        assert {profile.startup_id for profile in workflow_result["validated_profiles"]} == {
+            startup.id,
+            financial_management.id,
+        }
+        assert {
+            validation.original_sources[0].source_id
+            for validation in workflow_result["validated_claims"]
+        } == {evidence.id, financial_management_evidence.id}
 
         async with engine.connect() as connection:
             startup_indexes = await connection.run_sync(

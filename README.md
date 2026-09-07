@@ -355,6 +355,7 @@ Todas as chaves aceitas e valores locais não sensíveis estão em `backend/.env
 | `RETRIEVER__` | limite de startups retornadas e tamanho do trecho de evidência |
 | `EXTRACTOR__` | limites de fontes, contexto, fatos, listas e reparo da extração |
 | `STARTUP_CLASSIFIER__` | limites de fontes, contexto, justificativa, sinais e reparo da classificação |
+| `EVIDENCE_VALIDATOR__` | limites de fontes, itens, contexto, justificativa e reparo da validação |
 | `EMBEDDINGS__` | futuro modelo de embeddings |
 | `RERANKER__` | adaptador de reranking Cohere |
 
@@ -474,7 +475,26 @@ mesma startup e não altera afirmações do Extractor. Ele não valida fatos
 definitivamente, não consulta a base NVIDIA e não faz recomendações. Os limites
 operacionais usam o prefixo `STARTUP_CLASSIFIER__`.
 
-### 7.8. Qualidade e testes do backend
+### 7.8. Evidence Validator Agent
+
+Depois do Classifier, o Evidence Validator compara cada fato extraído e a
+classificação com os `excerpt`s recuperados. Cada avaliação usa `supported`,
+`unsupported`, `conflicting` ou `insufficient` e preserva UUID, URL e veredito
+das fontes analisadas.
+
+Os dados originais permanecem em `structured_profiles` e `classifications`. Os
+agentes posteriores devem consumir `validated_profiles` e
+`validated_classifications`; esses campos contêm somente fatos e classificações
+com suporte documental. Rejeições, conflitos e lacunas ficam separados em
+`rejected_claims`, `conflicting_claims` e `evidence_gaps`.
+
+Quando nenhum fato é aprovado, o fluxo retorna HTTP 200 com
+`validator_no_supported_claims` e perfis validados vazios, preservando a
+identidade das startups. O agente verifica suporte nos documentos fornecidos,
+não verdade factual definitiva, e não consulta URLs, banco, Qdrant ou base
+NVIDIA. Seus limites usam o prefixo `EVIDENCE_VALIDATOR__`.
+
+### 7.9. Qualidade e testes do backend
 
 Execute cada verificação separadamente:
 
@@ -485,6 +505,12 @@ uv run --project backend mypy --config-file backend/pyproject.toml backend/src b
 uv run --project backend lint-imports --config backend/.importlinter
 uv run --project backend pytest -c backend/pyproject.toml backend/tests -m "not integration"
 ```
+
+Os testes automatizados nunca enviam prompts para uma LLM real. Agentes usam
+`FakeChatModel` ou `SequenceChatModel`; testes do adaptador Groq injetam um
+cliente falso. Uma fixture automática bloqueia a construção de `ChatGroq` e faz
+o teste falhar antes de qualquer chamada de rede ou consumo de tokens. Os JSONs
+dos prompts também são serializados de forma compacta, sem espaços opcionais.
 
 Ou execute a verificação local agregada:
 

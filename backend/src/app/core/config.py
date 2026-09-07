@@ -107,6 +107,16 @@ class StartupClassifierConfig(BaseModel):
     max_repair_attempts: int = Field(default=1, ge=0, le=1)
 
 
+class EvidenceValidatorConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    max_sources_per_startup: int = Field(default=10, ge=1, le=50)
+    max_items_per_startup: int = Field(default=250, ge=1, le=500)
+    max_context_characters: int = Field(default=20_000, ge=100, le=200_000)
+    max_justification_length: int = Field(default=1_000, ge=50, le=4_000)
+    max_repair_attempts: int = Field(default=1, ge=0, le=1)
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=BACKEND_ROOT / ".env",
@@ -128,6 +138,7 @@ class Settings(BaseSettings):
     retriever: RetrieverConfig = RetrieverConfig()
     extractor: ExtractorConfig = ExtractorConfig()
     startup_classifier: StartupClassifierConfig = StartupClassifierConfig()
+    evidence_validator: EvidenceValidatorConfig = EvidenceValidatorConfig()
     embeddings: ModelProviderConfig = Field(
         default_factory=lambda: ModelProviderConfig(provider="unset", model="unset")
     )

@@ -119,6 +119,13 @@ def test_factory_requires_api_key_before_creating_client() -> None:
     assert "GROQ__API_KEY" in str(error.value)
 
 
+def test_automated_tests_block_live_llm_client_creation() -> None:
+    config = LLMProfileConfig(model="model", temperature=0)
+
+    with pytest.raises(AssertionError, match="Live LLM clients are forbidden"):
+        create_groq_chat_model(config=config, api_key="must-not-be-used", profile="fast")
+
+
 def test_factory_builds_configured_client_without_network(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

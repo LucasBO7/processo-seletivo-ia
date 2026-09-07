@@ -157,3 +157,8 @@ OpenAPI deverá expor todos os enums e contratos.
 ## Sugestão de commit
 
 `feat(classifier): classify structured startup profiles from evidence`
+
+## Evolução posterior
+
+A especificação 011 implementa Classifier → Evidence Validator e mantém o
+encerramento em `END` após a validação documental.

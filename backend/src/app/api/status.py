@@ -12,6 +12,8 @@ ERROR_STATUS_BY_CODE = {
     "extractor_unavailable": status.HTTP_503_SERVICE_UNAVAILABLE,
     "classifier_invalid_output": status.HTTP_502_BAD_GATEWAY,
     "classifier_unavailable": status.HTTP_503_SERVICE_UNAVAILABLE,
+    "evidence_validator_invalid_output": status.HTTP_502_BAD_GATEWAY,
+    "evidence_validator_unavailable": status.HTTP_503_SERVICE_UNAVAILABLE,
 }
 
 

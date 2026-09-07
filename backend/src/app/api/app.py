@@ -16,6 +16,7 @@ from app.api.routes.search import router as search_router
 from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging
 from app.core.resources import ApplicationResources
+from app.graph.agents.evidence_validator import create_evidence_validator_agent
 from app.graph.agents.extractor import create_extractor_agent
 from app.graph.agents.query_planner import create_query_planner_agent
 from app.graph.agents.retriever import RetrieverAgent
@@ -73,11 +74,15 @@ async def create_resources(settings: Settings) -> ApplicationResources:
     startup_classifier = create_startup_classifier_agent(
         registry=model_registry, config=settings.startup_classifier
     )
+    evidence_validator = create_evidence_validator_agent(
+        registry=model_registry, config=settings.evidence_validator
+    )
     workflow = compile_analysis_workflow(
         query_planner=query_planner,
         retriever=retriever,
         extractor=extractor,
         startup_classifier=startup_classifier,
+        evidence_validator=evidence_validator,
     )
     qdrant = create_qdrant_client(settings.qdrant)
     try:
@@ -98,6 +103,7 @@ async def create_resources(settings: Settings) -> ApplicationResources:
         query_planner=query_planner,
         extractor=extractor,
         startup_classifier=startup_classifier,
+        evidence_validator=evidence_validator,
         workflow=workflow,
     )
 

@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import json
-
 from app.application.contracts.classification import ClassifierOutput
 from app.application.contracts.extraction import StructuredStartupProfile
 from app.domain.models import SourceReference
+from app.graph.prompts.json_format import compact_json
 
 PROMPT_VERSION = "startup-classifier-v1"
 
@@ -26,9 +25,9 @@ def build_messages(
         "Do not use external knowledge, validate facts definitively, alter profile "
         "facts, query other systems, or recommend NVIDIA technologies. Return JSON "
         "only, strictly matching this schema: "
-        f"{json.dumps(ClassifierOutput.model_json_schema(), ensure_ascii=False)}"
+        f"{compact_json(ClassifierOutput.model_json_schema())}"
     )
-    user_prompt = json.dumps(
+    user_prompt = compact_json(
         {
             "profile": profile.model_dump(mode="json"),
             "documents": [
@@ -42,13 +41,12 @@ def build_messages(
                 for source in sources
             ],
         },
-        ensure_ascii=False,
     )
     return system_prompt, user_prompt
 
 
 def build_repair_message(candidate: str, *, sources: list[SourceReference]) -> str:
-    return json.dumps(
+    return compact_json(
         {
             "instruction": (
                 "Repair the candidate into valid JSON matching the schema. Preserve "
@@ -65,5 +63,4 @@ def build_repair_message(candidate: str, *, sources: list[SourceReference]) -> s
             ],
             "invalid_candidate": candidate,
         },
-        ensure_ascii=False,
     )

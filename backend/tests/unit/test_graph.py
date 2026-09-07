@@ -8,10 +8,11 @@ import pytest
 
 from app.application.contracts.extraction import ProfileField, StructuredStartupProfile
 from app.application.contracts.query_plan import QueryPlan
-from app.domain.models import Evidence, RecoverableError, SourceReference
+from app.domain.models import RecoverableError, SourceReference
 from app.graph.builder import (
     compile_analysis_workflow,
     create_graph_builder,
+    route_after_classifier,
     route_after_extractor,
     route_after_query_planner,
     route_after_retriever,
@@ -34,11 +35,11 @@ def test_state_accepts_partial_updates_and_traceable_evidence() -> None:
         title="Fonte",
     )
     state = empty_state(run_id=uuid4(), correlation_id="corr-1", query="fintechs")
-    update = AppState(validated_claims=[Evidence(claim="Usa IA", sources=(source,))])
+    update = AppState(selected_sources=[source])
     state.update(update)
 
     encoded = json.dumps(
-        {**state, "validated_claims": [asdict(item) for item in state["validated_claims"]]},
+        {**state, "selected_sources": [asdict(item) for item in state["selected_sources"]]},
         default=str,
     )
     assert "https://example.com" in encoded
@@ -79,6 +80,7 @@ def test_builder_registers_current_nodes() -> None:
         retriever=RecordingNode(AppState()),
         extractor=RecordingNode(AppState()),
         startup_classifier=RecordingNode(AppState()),
+        evidence_validator=RecordingNode(AppState()),
     )
 
     assert set(builder.nodes) == {
@@ -86,6 +88,7 @@ def test_builder_registers_current_nodes() -> None:
         "retriever",
         "extractor",
         "startup_classifier",
+        "evidence_validator",
     }
 
 
@@ -145,6 +148,15 @@ def test_route_after_extractor_requires_profile() -> None:
     assert route_after_extractor(AppState()) == "stop"
 
 
+def test_route_after_classifier_requires_profile_not_classification() -> None:
+    profile = StructuredStartupProfile(
+        startup_id=uuid4(), name="Acme", unknown_fields=list(ProfileField)
+    )
+
+    assert route_after_classifier(AppState(structured_profiles=[profile])) == "validate"
+    assert route_after_classifier(AppState(structured_profiles=[])) == "stop"
+
+
 @pytest.mark.asyncio
 async def test_workflow_runs_retriever_and_preserves_traceable_state() -> None:
     startup_id = uuid4()
@@ -172,11 +184,13 @@ async def test_workflow_runs_retriever_and_preserves_traceable_state() -> None:
     )
     extractor = RecordingNode(AppState())
     startup_classifier = RecordingNode(AppState())
+    evidence_validator = RecordingNode(AppState())
     workflow = compile_analysis_workflow(
         query_planner=planner,
         retriever=retriever,
         extractor=extractor,
         startup_classifier=startup_classifier,
+        evidence_validator=evidence_validator,
     )
 
     result = await workflow.ainvoke(
@@ -186,6 +200,7 @@ async def test_workflow_runs_retriever_and_preserves_traceable_state() -> None:
     assert len(retriever.calls) == 1
     assert len(extractor.calls) == 1
     assert startup_classifier.calls == []
+    assert evidence_validator.calls == []
     assert retriever.calls[0]["query_plan"] == query_plan()
     assert result["candidate_startups"][0]["startup_id"] == startup_id
     assert result["selected_sources"][0].source_id == source.source_id
@@ -218,17 +233,21 @@ async def test_workflow_runs_classifier_only_after_extractor_profile() -> None:
     )
     extractor = RecordingNode(AppState(structured_profiles=[profile]))
     startup_classifier = RecordingNode(AppState())
+    evidence_validator = RecordingNode(AppState())
     workflow = compile_analysis_workflow(
         query_planner=planner,
         retriever=retriever,
         extractor=extractor,
         startup_classifier=startup_classifier,
+        evidence_validator=evidence_validator,
     )
 
     await workflow.ainvoke(empty_state(run_id=uuid4(), correlation_id="classify", query="startups"))
 
     assert len(startup_classifier.calls) == 1
     assert startup_classifier.calls[0]["structured_profiles"] == [profile]
+    assert len(evidence_validator.calls) == 1
+    assert evidence_validator.calls[0]["structured_profiles"] == [profile]
 
 
 @pytest.mark.asyncio
@@ -238,11 +257,13 @@ async def test_workflow_stops_before_retriever_for_non_ready_plan(status: str) -
     retriever = RecordingNode(AppState())
     extractor = RecordingNode(AppState())
     startup_classifier = RecordingNode(AppState())
+    evidence_validator = RecordingNode(AppState())
     workflow = compile_analysis_workflow(
         query_planner=planner,
         retriever=retriever,
         extractor=extractor,
         startup_classifier=startup_classifier,
+        evidence_validator=evidence_validator,
     )
 
     result = await workflow.ainvoke(
@@ -263,11 +284,13 @@ async def test_workflow_stops_before_retriever_when_planner_fails() -> None:
     retriever = RecordingNode(AppState())
     extractor = RecordingNode(AppState())
     startup_classifier = RecordingNode(AppState())
+    evidence_validator = RecordingNode(AppState())
     workflow = compile_analysis_workflow(
         query_planner=planner,
         retriever=retriever,
         extractor=extractor,
         startup_classifier=startup_classifier,
+        evidence_validator=evidence_validator,
     )
 
     result = await workflow.ainvoke(
@@ -284,11 +307,13 @@ async def test_workflow_invocations_do_not_share_mutable_state() -> None:
     retriever = RecordingNode(AppState())
     extractor = RecordingNode(AppState())
     startup_classifier = RecordingNode(AppState())
+    evidence_validator = RecordingNode(AppState())
     workflow = compile_analysis_workflow(
         query_planner=planner,
         retriever=retriever,
         extractor=extractor,
         startup_classifier=startup_classifier,
+        evidence_validator=evidence_validator,
     )
 
     first = await workflow.ainvoke(
