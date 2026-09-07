@@ -6,6 +6,7 @@ import sys
 from collections.abc import Iterator
 from typing import cast
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -31,6 +32,20 @@ def block_live_llm_clients(monkeypatch: pytest.MonkeyPatch) -> None:
         raise AssertionError("Live LLM clients are forbidden in automated tests.")
 
     monkeypatch.setattr("app.infrastructure.providers.groq.ChatGroq", blocked_client)
+
+
+@pytest.fixture(autouse=True)
+def block_unapproved_network(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Allow real network only in explicitly enabled integration/external runs."""
+    import os
+
+    if os.getenv("RUN_INTEGRATION_TESTS") == "1" or os.getenv("RUN_EXTERNAL_TESTS") == "1":
+        return
+
+    async def blocked_request(*_: object, **__: object) -> None:
+        raise AssertionError("Real network is forbidden in automated tests.")
+
+    monkeypatch.setattr(httpx.AsyncHTTPTransport, "handle_async_request", blocked_request)
 
 
 class StubWorkflow:

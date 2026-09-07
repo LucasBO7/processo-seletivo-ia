@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import re
 from collections.abc import Sequence
 
@@ -34,3 +35,13 @@ class BM25Retriever:
             RankedDocument(document_id=item.document_id, text=item.text, score=float(score))
             for item, score in ranked
         ]
+
+
+def bm25_corpus_fingerprint(documents: Sequence[RankedDocument]) -> str:
+    digest = hashlib.sha256()
+    for item in sorted(documents, key=lambda value: value.document_id):
+        digest.update(item.document_id.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(item.text.encode("utf-8"))
+        digest.update(b"\0")
+    return digest.hexdigest()

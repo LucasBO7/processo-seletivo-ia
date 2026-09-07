@@ -42,6 +42,22 @@ def test_settings_parse_nested_values() -> None:
     assert settings.evidence_validator.max_sources_per_startup == 10
     assert settings.evidence_validator.max_items_per_startup == 250
     assert settings.evidence_validator.max_repair_attempts == 1
+    assert settings.knowledge_ingestion.pipeline_version == "knowledge-v1"
+    assert settings.knowledge_ingestion.chunk_max_characters == 1_500
+    assert settings.knowledge_ingestion.chunk_overlap_characters == 150
+
+
+def test_knowledge_ingestion_rejects_invalid_overlap() -> None:
+    with pytest.raises(ValidationError, match="overlap"):
+        Settings(
+            _env_file=None,
+            postgres={"url": "postgresql+psycopg://user:secret@localhost/database"},
+            qdrant={"url": "http://localhost:6333"},
+            knowledge_ingestion={
+                "chunk_max_characters": 200,
+                "chunk_overlap_characters": 200,
+            },
+        )
 
 
 def test_retriever_limits_parse_environment(monkeypatch: pytest.MonkeyPatch) -> None:

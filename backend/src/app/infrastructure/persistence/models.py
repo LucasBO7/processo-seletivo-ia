@@ -93,7 +93,12 @@ class KnowledgeDocumentRow(TimestampMixin, Base):
     source_url: Mapped[str] = mapped_column(String(2048), nullable=False)
     content_type: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    content_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    source_key: Mapped[str] = mapped_column(String(120), nullable=False, unique=True, index=True)
+    technology: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    pipeline_version: Mapped[str] = mapped_column(String(40), nullable=False)
+    ingested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
 class KnowledgeChunkRow(TimestampMixin, Base):

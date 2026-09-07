@@ -4,7 +4,15 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, SecretStr, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    HttpUrl,
+    SecretStr,
+    field_validator,
+    model_validator,
+)
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_ROOT = Path(__file__).resolve().parents[3]
@@ -117,6 +125,32 @@ class EvidenceValidatorConfig(BaseModel):
     max_repair_attempts: int = Field(default=1, ge=0, le=1)
 
 
+class KnowledgeIngestionConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    manifest_path: Path = BACKEND_ROOT / "scripts" / "nvidia_sources.json"
+    pipeline_version: str = Field(default="knowledge-v1", min_length=1, max_length=40)
+    request_timeout_seconds: float = Field(default=20.0, gt=0, le=120)
+    request_max_retries: int = Field(default=2, ge=0, le=5)
+    max_source_bytes: int = Field(default=5_000_000, ge=1_000, le=50_000_000)
+    chunk_max_characters: int = Field(default=1_500, ge=100, le=10_000)
+    chunk_overlap_characters: int = Field(default=150, ge=0, le=2_000)
+    embedding_batch_size: int = Field(default=32, ge=1, le=256)
+    max_concurrency: int = Field(default=4, ge=1, le=16)
+
+    @field_validator("manifest_path", mode="before")
+    @classmethod
+    def resolve_manifest_path(cls, value: object) -> Path:
+        path = Path(str(value))
+        return path if path.is_absolute() else BACKEND_ROOT / path
+
+    @model_validator(mode="after")
+    def validate_chunk_overlap(self) -> Self:
+        if self.chunk_overlap_characters >= self.chunk_max_characters:
+            raise ValueError("chunk overlap deve ser menor que o tamanho do chunk")
+        return self
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=BACKEND_ROOT / ".env",
@@ -139,6 +173,7 @@ class Settings(BaseSettings):
     extractor: ExtractorConfig = ExtractorConfig()
     startup_classifier: StartupClassifierConfig = StartupClassifierConfig()
     evidence_validator: EvidenceValidatorConfig = EvidenceValidatorConfig()
+    knowledge_ingestion: KnowledgeIngestionConfig = KnowledgeIngestionConfig()
     embeddings: ModelProviderConfig = Field(
         default_factory=lambda: ModelProviderConfig(provider="unset", model="unset")
     )

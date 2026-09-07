@@ -1,0 +1,34 @@
+{
+  "version": "2026-09-07",
+  "allowed_domains": [
+    "www.nvidia.com",
+    "developer.nvidia.com",
+    "docs.nvidia.com",
+    "build.nvidia.com",
+    "github.com",
+    "rapids.ai",
+    "docs.rapids.ai",
+    "blogs.nvidia.com"
+  ],
+  "sources": [
+    {"source_key":"nvidia-inception","technology":"nvidia_inception","canonical_url":"https://www.nvidia.com/en-us/startups/","content_type":"html","extractor":"web","required":true,"enabled":true},
+    {"source_key":"nvidia-nim","technology":"nvidia_nim","canonical_url":"https://www.nvidia.com/en-us/ai-data-science/products/nim-microservices/","content_type":"html","extractor":"web","required":true,"enabled":true},
+    {"source_key":"nvidia-build","technology":"nvidia_nim","canonical_url":"https://build.nvidia.com/","content_type":"html","extractor":"web","required":false,"enabled":true},
+    {"source_key":"nvidia-nemo","technology":"nvidia_nemo","canonical_url":"https://www.nvidia.com/en-us/ai-data-science/products/nemo/","content_type":"html","extractor":"web","required":true,"enabled":true},
+    {"source_key":"nemo-guardrails","technology":"nemo_guardrails","canonical_url":"https://github.com/NVIDIA/NeMo-Guardrails","content_type":"html","extractor":"web","required":true,"enabled":true},
+    {"source_key":"triton-overview","technology":"triton_inference_server","canonical_url":"https://developer.nvidia.com/triton-inference-server","content_type":"html","extractor":"web","required":true,"enabled":true},
+    {"source_key":"triton-docs","technology":"triton_inference_server","canonical_url":"https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/","content_type":"html","extractor":"web","required":false,"enabled":true},
+    {"source_key":"tensorrt-llm","technology":"tensorrt_llm","canonical_url":"https://github.com/NVIDIA/TensorRT-LLM","content_type":"html","extractor":"web","required":true,"enabled":true},
+    {"source_key":"rapids","technology":"rapids","canonical_url":"https://rapids.ai/","content_type":"html","extractor":"web","required":true,"enabled":true},
+    {"source_key":"cudf","technology":"cudf","canonical_url":"https://docs.rapids.ai/api/cudf/stable/","content_type":"html","extractor":"web","required":true,"enabled":true},
+    {"source_key":"cuml","technology":"cuml","canonical_url":"https://docs.rapids.ai/api/cuml/stable/","content_type":"html","extractor":"web","required":true,"enabled":true},
+    {"source_key":"cuda","technology":"cuda","canonical_url":"https://developer.nvidia.com/cuda-toolkit","content_type":"html","extractor":"web","required":true,"enabled":true},
+    {"source_key":"riva","technology":"riva","canonical_url":"https://developer.nvidia.com/riva","content_type":"html","extractor":"web","required":true,"enabled":true},
+    {"source_key":"omniverse","technology":"omniverse","canonical_url":"https://www.nvidia.com/en-us/omniverse/","content_type":"html","extractor":"web","required":true,"enabled":true},
+    {"source_key":"isaac","technology":"isaac","canonical_url":"https://developer.nvidia.com/isaac","content_type":"html","extractor":"web","required":true,"enabled":true},
+    {"source_key":"clara","technology":"clara","canonical_url":"https://www.nvidia.com/en-us/clara/","content_type":"html","extractor":"web","required":true,"enabled":true},
+    {"source_key":"morpheus","technology":"morpheus","canonical_url":"https://developer.nvidia.com/morpheus-cybersecurity","content_type":"html","extractor":"web","required":true,"enabled":true},
+    {"source_key":"nvidia-ai-enterprise","technology":"nvidia_ai_enterprise","canonical_url":"https://www.nvidia.com/en-us/data-center/products/ai-enterprise/","content_type":"html","extractor":"web","required":true,"enabled":true},
+    {"source_key":"nvidia-ai-layer-cake","technology":"nvidia_ai_enterprise","canonical_url":"https://blogs.nvidia.com/blog/ai-5-layer-cake/","content_type":"html","extractor":"web","required":false,"enabled":true}
+  ]
+}

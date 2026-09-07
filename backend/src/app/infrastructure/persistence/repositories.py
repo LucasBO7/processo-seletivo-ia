@@ -156,6 +156,8 @@ class SqlAlchemyKnowledgeDocumentRepository:
         self._sessions = sessions
 
     async def add(self, document: KnowledgeDocument) -> KnowledgeDocument:
+        document.source_key = document.source_key or f"legacy-{document.id}"
+        document.technology = document.technology or "unknown"
         async with self._sessions.begin() as session:
             session.add(KnowledgeDocumentRow(**_knowledge_document_values(document)))
         return document
@@ -285,6 +287,11 @@ def _knowledge_document_values(value: KnowledgeDocument) -> dict[str, object]:
         "content_type": value.content_type,
         "published_at": value.published_at,
         "content_hash": value.content_hash,
+        "source_key": value.source_key or f"legacy-{value.id}",
+        "technology": value.technology or "unknown",
+        "revision": value.revision,
+        "pipeline_version": value.pipeline_version,
+        "ingested_at": value.ingested_at,
         "created_at": value.created_at,
         "updated_at": value.updated_at,
     }
@@ -298,6 +305,11 @@ def _knowledge_document_from_row(row: KnowledgeDocumentRow) -> KnowledgeDocument
         content_type=row.content_type,
         published_at=row.published_at,
         content_hash=row.content_hash,
+        source_key=row.source_key,
+        technology=row.technology,
+        revision=row.revision,
+        pipeline_version=row.pipeline_version,
+        ingested_at=row.ingested_at,
         created_at=row.created_at,
         updated_at=row.updated_at,
     )

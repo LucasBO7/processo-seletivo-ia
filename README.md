@@ -494,7 +494,28 @@ identidade das startups. O agente verifica suporte nos documentos fornecidos,
 não verdade factual definitiva, e não consulta URLs, banco, Qdrant ou base
 NVIDIA. Seus limites usam o prefixo `EVIDENCE_VALIDATOR__`.
 
-### 7.9. Qualidade e testes do backend
+### 7.9. Base de conhecimento NVIDIA
+
+A ingestão operacional lê o manifesto versionado
+`backend/scripts/nvidia_sources.json`, coleta somente URLs oficiais autorizadas,
+normaliza e divide os documentos, gera embeddings e publica os chunks no
+PostgreSQL e no Qdrant. As 16 tecnologias obrigatórias do TAPI são verificadas.
+
+O PostgreSQL é a fonte de verdade. A URL oficial é armazenada obrigatoriamente em
+`knowledge_documents.source_url` e replicada nos metadados dos chunks e no
+payload do Qdrant. O BM25 é reconstruído dos chunks persistidos; a busca híbrida,
+o RAG Agent, reranking e recomendações ainda não fazem parte desta entrega.
+
+```powershell
+uv run --project backend alembic -c backend/alembic.ini upgrade head
+uv run --project backend startup-radar-knowledge ingest
+uv run --project backend startup-radar-knowledge verify
+```
+
+Consulte `backend/scripts/README.md` para dry-run offline, filtros e recuperação
+de falhas.
+
+### 7.10. Qualidade e testes do backend
 
 Execute cada verificação separadamente:
 
@@ -534,7 +555,7 @@ testes reproduzíveis e não exige Docker no ambiente local de desenvolvimento.
 
 Para atualizar uma dependência de forma consciente, altere sua restrição com `uv add --project backend <pacote>` e revise o diff de `backend/pyproject.toml` e `backend/uv.lock` antes de executar os testes.
 
-### 7.7. Migrações
+### 7.11. Migrações
 
 ```bash
 uv run --project backend alembic -c backend/alembic.ini current

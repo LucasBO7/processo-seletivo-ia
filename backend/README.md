@@ -23,6 +23,18 @@ O Query Planner, Extractor, Evidence Validator e NVIDIA RAG usam o perfil rápid
 Startup Classifier, Recommendation e Briefing usam o perfil pesado. O Retriever
 executa somente código de recuperação e não recebe LLM.
 
+## Base NVIDIA
+
+A spec 012 adiciona uma ingestão independente do LangGraph. O manifesto
+`scripts/nvidia_sources.json` cobre NVIDIA Inception, NIM, NeMo, NeMo Guardrails,
+Triton, TensorRT-LLM, RAPIDS, cuDF, cuML, CUDA, Riva, Omniverse, Isaac, Clara,
+Morpheus e NVIDIA AI Enterprise.
+
+Use `startup-radar-knowledge ingest`, `dry-run` ou `verify`. O texto e a URL
+oficial em `knowledge_documents.source_url` permanecem canônicos no PostgreSQL;
+Qdrant e BM25 são índices derivados. Testes comuns usam fixtures e embeddings
+falsos e não acessam a rede.
+
 ## Query Planner
 
 O Query Planner é um nó assíncrono que depende somente do contrato interno

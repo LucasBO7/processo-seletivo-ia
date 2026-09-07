@@ -122,6 +122,11 @@ class KnowledgeDocument:
     content_type: str
     content_hash: str
     published_at: datetime | None = None
+    source_key: str | None = None
+    technology: str | None = None
+    revision: int = 1
+    pipeline_version: str = "legacy-v1"
+    ingested_at: datetime = field(default_factory=utc_now)
     id: UUID = field(default_factory=uuid4)
     created_at: datetime = field(default_factory=utc_now)
     updated_at: datetime = field(default_factory=utc_now)
