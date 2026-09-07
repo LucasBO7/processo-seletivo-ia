@@ -59,7 +59,7 @@ async def test_schema_repositories_and_qdrant_are_consistent() -> None:
         suffix = uuid4().hex
         startup = Startup(
             name=f"Startup {suffix}",
-            sector=f"Sector {suffix}",
+            sector="Fintech / Crédito",
             stage="Seed",
             location="Brasil",
             team_size=25,
@@ -73,11 +73,28 @@ async def test_schema_repositories_and_qdrant_are_consistent() -> None:
             source_url=f"https://example.com/{suffix}",
         )
         await startup_document_repository.add(evidence)
+        financial_management = Startup(
+            name=f"Financial SaaS {suffix}",
+            sector="SaaS de Gestão Financeira",
+            stage="Seed",
+            location="Brasil",
+            short_description=f"Gestão financeira com sinal {suffix}.",
+            team_size=30,
+        )
+        await startup_repository.add(financial_management)
+        financial_management_evidence = StartupDocument(
+            startup_id=financial_management.id,
+            document_type="site",
+            title="Produto financeiro",
+            content_text=f"SaaS financeiro com sinal {suffix}.",
+            source_url=f"https://financial.example/{suffix}",
+        )
+        await startup_document_repository.add(financial_management_evidence)
         assert (await startup_repository.get(startup.id)) == startup
         assert (await startup_document_repository.list_for_startup(startup.id))[0] == evidence
         ranked = await startup_repository.search(
             StartupSearchCriteria(
-                sectors=(f"sector {suffix}",),
+                sectors=("fintech / crédito",),
                 stages=("seed",),
                 locations=("brasil",),
                 text_terms=(suffix,),
@@ -94,8 +111,8 @@ async def test_schema_repositories_and_qdrant_are_consistent() -> None:
                     "status": "ready",
                     "normalized_query": f"startup {suffix}",
                     "filters": {
-                        "sectors": [f"Sector {suffix}"],
-                        "stages": ["Seed"],
+                        "sectors": ["financial_services"],
+                        "stages": ["seed"],
                         "locations": ["Brasil"],
                         "keywords": [suffix],
                     },
@@ -127,9 +144,18 @@ async def test_schema_repositories_and_qdrant_are_consistent() -> None:
                 query=f"startup {suffix}",
             )
         )
-        assert workflow_result["candidate_startups"][0]["startup_id"] == startup.id
-        assert workflow_result["selected_sources"][0].source_id == evidence.id
-        assert workflow_result["selected_sources"][0].source_url == evidence.source_url
+        assert {item["startup_id"] for item in workflow_result["candidate_startups"]} == {
+            startup.id,
+            financial_management.id,
+        }
+        assert {source.source_id for source in workflow_result["selected_sources"]} == {
+            evidence.id,
+            financial_management_evidence.id,
+        }
+        assert {source.source_url for source in workflow_result["selected_sources"]} == {
+            evidence.source_url,
+            financial_management_evidence.source_url,
+        }
 
         async with engine.connect() as connection:
             startup_indexes = await connection.run_sync(

@@ -232,6 +232,50 @@ def test_search_returns_non_ready_plan_without_results(settings: Settings) -> No
     assert response.json()["candidate_startups"] == []
 
 
+def test_search_exposes_unresolved_filter_suggestions(settings: Settings) -> None:
+    workflow = StubWorkflow(
+        AppState(
+            query_plan=QueryPlan.model_validate_json(
+                plan_response(
+                    status="needs_clarification",
+                    filters={},
+                    ambiguities=["Setor não reconhecido."],
+                    clarification_questions=["Qual categoria representa melhor o setor?"],
+                    unresolved_filters=[
+                        {"field": "sector", "requested_value": "agricultura espacial"}
+                    ],
+                    filter_suggestions=[
+                        {
+                            "field": "sector",
+                            "requested_value": "agricultura espacial",
+                            "options": [
+                                "industry_4_0",
+                                "data_and_ai",
+                                "managed_it_services",
+                            ],
+                        }
+                    ],
+                )
+            ),
+            warnings=["query_plan_needs_clarification"],
+            errors=[],
+        )
+    )
+
+    with client_with_workflow(settings, workflow) as client:
+        response = client.post("/api/v1/search", json={"query": "startups de agricultura espacial"})
+
+    assert response.status_code == 200
+    plan = response.json()["query_plan"]
+    assert plan["unresolved_filters"][0]["requested_value"] == "agricultura espacial"
+    assert plan["filter_suggestions"][0]["options"] == [
+        "industry_4_0",
+        "data_and_ai",
+        "managed_it_services",
+    ]
+    assert response.json()["candidate_startups"] == []
+
+
 def test_search_returns_invalid_plan_with_http_200(settings: Settings) -> None:
     workflow = StubWorkflow(
         AppState(
@@ -326,6 +370,11 @@ def test_openapi_exposes_current_functional_routes(client: TestClient) -> None:
     assert "/api/v1/search" in paths
     assert "/health/live" not in paths
     assert "/health/ready" not in paths
+    schemas = response.json()["components"]["schemas"]
+    assert "financial_services" in schemas["Sector"]["enum"]
+    assert "seed" in schemas["StartupStage"]["enum"]
+    assert "small" in schemas["CompanySize"]["enum"]
+    assert "FilterSuggestion" in schemas
 
 
 @pytest.mark.parametrize("path", ["/health/live", "/health/ready"])

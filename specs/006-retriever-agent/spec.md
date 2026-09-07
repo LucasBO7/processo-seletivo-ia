@@ -9,6 +9,10 @@ A implementação foi autorizada por solicitação explícita do responsável pe
 projeto. As tarefas T-01 a T-10 foram concluídas; a T-11 permanece aberta até a
 validação da entrega.
 
+> Evolução pela especificação 008: setores e estágios canônicos passaram a ser
+> expandidos para os rótulos persistidos reconhecidos antes da consulta; os dados
+> originais continuam preservados.
+
 ## Contexto
 
 O Query Planner produz um `QueryPlan` validado com filtros de setor, porte,

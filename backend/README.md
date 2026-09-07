@@ -31,6 +31,11 @@ O Query Planner é um nó assíncrono que depende somente do contrato interno
 análise. Entradas inválidas são rejeitadas antes do modelo e respostas malformadas
 possuem no máximo uma tentativa configurável de reparo.
 
+Setor, estágio e porte usam Enums canônicos. Aliases conhecidos são
+normalizados; um filtro explícito desconhecido produz `needs_clarification`,
+`unresolved_filters` e três `filter_suggestions` válidas. Consultas que não
+solicitam filtros permanecem exploratórias e executáveis.
+
 Os limites não sensíveis ficam no grupo `QUERY_PLANNER__`: tamanho da consulta,
 itens por lista, perguntas de esclarecimento, justificativa e tentativas de
 reparo. O agente não acessa PostgreSQL, Qdrant ou SDKs concretos e é exposto por
@@ -46,6 +51,10 @@ PostgreSQL e carrega seus documentos em lote. Setor, estágio e localização s�
 filtros sem diferença de caixa; portes conhecidos e intervalos numéricos são
 traduzidos para `team_size`; palavras-chave e sinais de IA contribuem para o
 score textual. A ordenação usa score, nome e UUID para permanecer determinística.
+
+Os Enums de setor e estágio são expandidos para rótulos persistidos. Por
+exemplo, `financial_services` consulta `Fintech / Crédito` e
+`SaaS de Gestão Financeira` com OR, sem reescrever os dados importados.
 
 As saídas usam `candidate_startups` e `selected_sources`, preservando UUIDs e
 URLs. Os limites `RETRIEVER__MAX_RESULTS` e `RETRIEVER__EXCERPT_LENGTH` controlam

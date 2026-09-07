@@ -2,8 +2,8 @@
 
 ## Status
 
-Proposta. Esta especificação precisa de aprovação explícita antes da
-implementação.
+Implementada e validada tecnicamente em 7 de setembro de 2026. Aguardando
+aprovação explícita da entrega para conclusão formal.
 
 ## Contexto
 
@@ -24,6 +24,8 @@ controlado sem exigir que a pessoa conheça os rótulos internos do banco.
 - Restringir o Query Planner a filtros reconhecidos pelo sistema.
 - Resolver sinônimos em português e inglês para valores canônicos.
 - Associar uma categoria canônica a um ou mais rótulos existentes no banco.
+- Diferenciar uma consulta ampla de um filtro solicitado que não foi reconhecido.
+- Sugerir categorias próximas quando um filtro explícito não puder ser resolvido.
 - Preservar localização, palavras-chave e sinais de IA como campos textuais.
 - Manter compatibilidade com a rota `/api/v1/search` e os dados existentes.
 
@@ -47,6 +49,8 @@ Critérios de aceite:
 - Valores repetidos após expansão são removidos com ordem determinística.
 - Campos não solicitados continuam vazios; a taxonomia não autoriza inventar
   filtros ausentes na consulta.
+- Uma consulta que não solicita filtros pode permanecer `ready` com listas
+  vazias e estratégia `exploratory`.
 
 ### US-02 — Pesquisar por sinônimos de setor
 
@@ -111,8 +115,18 @@ Critérios de aceite:
 
 - A resposta mantém o `QueryPlan` com valores canônicos efetivamente usados.
 - Aliases reconhecidos podem adicionar o aviso `query_filter_normalized`.
-- Valor desconhecido após a tentativa de reparo produz
-  `query_plan_invalid_output`, sem executar o Retriever.
+- Um termo explícito que não corresponda a um Enum ou alias conhecido produz
+  `needs_clarification`, sem executar o Retriever.
+- Para cada filtro enumerado não reconhecido, o plano preserva o termo solicitado
+  e oferece até três opções válidas da mesma taxonomia, ordenadas da mais para a
+  menos próxima semanticamente.
+- Quando a taxonomia possuir ao menos três opções, a sugestão contém exatamente
+  três alternativas distintas; nenhuma sugestão é aplicada automaticamente.
+- As sugestões são produzidas na chamada já existente do Query Planner e só
+  podem conter valores dos Enums permitidos.
+- Resposta malformada, sugestão fora do Enum ou invariantes inválidas passam pela
+  tentativa de reparo; persistindo o problema, produzem
+  `query_plan_invalid_output`.
 - Busca legitimamente vazia continua retornando `retriever_no_results` e HTTP
   200.
 - A consulta não relaxa ou remove filtros silenciosamente nesta feature.
@@ -164,6 +178,20 @@ StartupSearchFilters
 ├── locations: list[string]
 ├── keywords: list[string]
 └── ai_usage_signals: list[string]
+
+QueryPlan
+├── filters: StartupSearchFilters
+├── unresolved_filters: list[UnresolvedFilter]
+└── filter_suggestions: list[FilterSuggestion]
+
+UnresolvedFilter
+├── field: sector | stage | company_size
+└── requested_value: string
+
+FilterSuggestion
+├── field: sector | stage | company_size
+├── requested_value: string
+└── options: list[Sector | StartupStage | CompanySize] (máximo 3)
 ```
 
 Os valores JSON dos Enums são parte do contrato público. Os nomes das classes e
@@ -176,13 +204,18 @@ alterar os comportamentos desta especificação.
 - **RF-02:** centralizar aliases, descrições e rótulos persistidos reconhecidos.
 - **RF-03:** incluir a taxonomia permitida nas instruções do Query Planner.
 - **RF-04:** normalizar aliases antes da validação final do `QueryPlan`.
-- **RF-05:** rejeitar valores desconhecidos após a tentativa de reparo existente.
+- **RF-05:** representar filtros enumerados não reconhecidos como pendências de
+  esclarecimento, sem convertê-los em busca ampla.
 - **RF-06:** traduzir filtros canônicos para critérios de persistência.
 - **RF-07:** permitir expansão de uma categoria para múltiplos rótulos usando OR.
 - **RF-08:** manter AND entre campos diferentes, conforme a spec 006.
 - **RF-09:** preservar filtros textuais abertos e dados originais persistidos.
 - **RF-10:** expor os valores canônicos nos endpoints existentes sem criar nova
   rota.
+- **RF-11:** sugerir até três opções válidas da taxonomia para cada filtro
+  enumerado não reconhecido.
+- **RF-12:** validar que sugestões pertencem ao campo correto, são distintas e
+  não são aplicadas sem nova escolha da pessoa usuária.
 
 ## Requisitos não funcionais
 
@@ -195,6 +228,48 @@ alterar os comportamentos desta especificação.
 - **RNF-07:** preservar compatibilidade de UUIDs, URLs, ordenação e limites do
   Retriever.
 - **RNF-08:** manter Ruff, mypy, testes arquiteturais e cobertura mínima de 80%.
+- **RNF-09:** gerar sugestões na mesma chamada do Query Planner, sem adicionar
+  outra chamada ao modelo ou acesso externo.
+
+## Comportamento quando não há filtro aplicável
+
+| Situação | Status do plano | Retriever | Resultado esperado |
+| --- | --- | --- | --- |
+| A consulta não solicita nenhum filtro | `ready` | Executa | Busca exploratória, limitada e ordenada, sobre todas as startups |
+| A consulta solicita um filtro enumerado não reconhecido | `needs_clarification` | Não executa | Termo original, pergunta e até três categorias canônicas sugeridas |
+| Os filtros são reconhecidos, mas não há registro compatível | `ready` | Executa | Listas vazias e aviso `retriever_no_results` |
+
+Um termo explícito não reconhecido nunca pode ser descartado para transformar a
+consulta silenciosamente em uma busca sem filtros. A pergunta de esclarecimento
+deve permitir selecionar uma das sugestões ou solicitar uma busca textual sem o
+filtro estruturado.
+
+Exemplo conceitual:
+
+```json
+{
+  "status": "needs_clarification",
+  "filters": {
+    "sectors": []
+  },
+  "unresolved_filters": [
+    {
+      "field": "sector",
+      "requested_value": "agricultura espacial"
+    }
+  ],
+  "filter_suggestions": [
+    {
+      "field": "sector",
+      "requested_value": "agricultura espacial",
+      "options": ["industry_4_0", "data_and_ai", "managed_it_services"]
+    }
+  ],
+  "clarification_questions": [
+    "Qual das categorias sugeridas representa melhor o setor desejado?"
+  ]
+}
+```
 
 ## Regras de compatibilidade
 
@@ -207,6 +282,8 @@ alterar os comportamentos desta especificação.
   contrato público.
 - A busca sem filtros permanece capaz de retornar todos os registros, inclusive
   os que não possuem mapeamento na taxonomia.
+- Os novos campos `unresolved_filters` e `filter_suggestions` usam listas vazias
+  por padrão para preservar respostas previsíveis.
 
 ## Fora do escopo
 
@@ -222,17 +299,18 @@ alterar os comportamentos desta especificação.
 
 | História | Requisitos | Validação |
 | --- | --- | --- |
-| US-01 | RF-01, RF-03 a RF-05, RF-10, RNF-01 | Testes de schema, prompt, normalização e rejeição |
+| US-01 | RF-01, RF-03 a RF-05, RF-10, RNF-01 | Testes de schema, prompt, normalização e consulta ampla |
 | US-02 | RF-02, RF-04, RF-06, RF-07, RNF-04, RNF-05 | Testes parametrizados de aliases financeiros e expansão |
 | US-03 | RF-01, RF-02, RF-06, RNF-01 | Testes de estágios, portes e intervalos |
 | US-04 | RF-06 a RF-09, RNF-02, RNF-03, RNF-07 | Integração com dados persistidos existentes |
-| US-05 | RF-04, RF-05, RF-10, RNF-06, RNF-08 | Testes de API, erros, logs e suíte completa |
+| US-05 | RF-04, RF-05, RF-10 a RF-12, RNF-06, RNF-08, RNF-09 | Testes de sugestões, API, erros, logs e suíte completa |
 
 ## Critério de conclusão
 
 A feature estará concluída quando consultas por sinônimos produzirem filtros
 canônicos, `financial_services` recuperar os rótulos financeiros existentes,
-valores desconhecidos forem bloqueados, os dados originais forem preservados e
+filtros desconhecidos solicitarem esclarecimento com até três sugestões válidas,
+consultas amplas continuarem executáveis, os dados originais forem preservados e
 todos os critérios passarem após aprovação explícita da entrega.
 
 ## Sugestão de commit

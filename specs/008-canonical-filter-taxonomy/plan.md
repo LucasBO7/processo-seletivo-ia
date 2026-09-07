@@ -2,15 +2,16 @@
 
 ## Status
 
-Planejamento proposto. A implementação depende da aprovação da especificação.
+Planejamento aprovado em 7 de setembro de 2026.
 
 ## Estratégia
 
 Criar um módulo de aplicação independente contendo os Enums, seus aliases e os
 rótulos persistidos reconhecidos. O Query Planner receberá no prompt somente as
-opções permitidas e normalizará aliases conhecidos antes de validar o plano. O
-Retriever converterá os Enums em conjuntos de rótulos aceitos pelo repositório,
-sem alterar os dados existentes.
+opções permitidas, normalizará aliases conhecidos e representará termos não
+resolvidos com até três sugestões válidas antes de validar o plano. O Retriever
+converterá os Enums em conjuntos de rótulos aceitos pelo repositório, sem alterar
+os dados existentes.
 
 A taxonomia será estática e versionada com o código. Essa escolha torna o
 contrato previsível e auditável, evitando que a IA ou um CSV modifiquem os
@@ -27,6 +28,7 @@ Criar um módulo na camada `application` com:
 - aliases normalizados por Enum;
 - mapeamento entre Enum e rótulos persistidos;
 - funções puras de normalização, expansão e deduplicação.
+- contratos tipados para filtro não resolvido e sugestões.
 
 O módulo não importará FastAPI, SQLAlchemy, SDKs de IA ou configurações de
 infraestrutura.
@@ -37,15 +39,22 @@ O schema de `StartupSearchFilters` passará a usar os Enums. A leitura da respos
 do modelo ocorrerá em duas etapas:
 
 1. normalizar valores exatos ou aliases reconhecidos;
-2. validar o objeto final com Pydantic.
+2. representar um termo explícito não reconhecido em `unresolved_filters`;
+3. sugerir até três valores permitidos do mesmo campo;
+4. validar o objeto final com Pydantic.
 
-Um alias poderá expandir para mais de um valor. Valores desconhecidos acionarão
-a tentativa de reparo já existente; persistindo o erro, será mantido
-`query_plan_invalid_output`.
+Um alias poderá expandir para mais de um valor. Um termo legítimo da consulta que
+não tenha correspondência produzirá `needs_clarification`, sem ser descartado ou
+enviado ao Retriever. Sugestões inválidas ou respostas estruturalmente
+malformadas acionarão a tentativa de reparo já existente; persistindo o erro,
+será mantido `query_plan_invalid_output`.
 
-O prompt apresentará identificadores, descrições e aliases necessários, sem
-consultar o PostgreSQL. O prompt continuará versionado e a consulta continuará
-tratada como dado não confiável.
+O prompt apresentará identificadores, descrições e aliases necessários e pedirá
+ao mesmo modelo que ordene as três opções semanticamente mais próximas quando
+houver um termo não resolvido. O validador aceitará apenas Enums do campo
+correto, sem consultar o PostgreSQL ou fazer uma segunda chamada ao modelo. O
+prompt continuará versionado e a consulta continuará tratada como dado não
+confiável.
 
 ### Retriever e persistência
 
@@ -60,8 +69,9 @@ ou estágio continuarão incluindo registros não mapeados.
 ### API
 
 As rotas e envelopes atuais serão preservados. OpenAPI passará a publicar os
-valores permitidos para os campos enumerados. O exemplo de Postman será atualizado
-para demonstrar que uma consulta financeira retorna filtros canônicos.
+valores permitidos para os campos enumerados e os contratos de sugestões. O
+exemplo de Postman será atualizado para demonstrar uma consulta financeira e um
+pedido de esclarecimento com sugestões.
 
 ## Decisões
 
@@ -88,9 +98,23 @@ permite validar o comportamento antes de redesenhar o modelo relacional.
 Uma busca vazia continuará vazia e explicável. Relaxamento progressivo poderá ser
 tratado por uma especificação própria, pois altera a precisão esperada.
 
+### D-05 — Sugestões estruturadas e não vinculantes
+
+As opções próximas serão parte do `QueryPlan`, e não apenas texto em uma
+pergunta. Isso permite renderização segura no frontend. A pessoa usuária precisa
+escolher ou reformular a consulta; o sistema não seleciona automaticamente a
+primeira sugestão.
+
+### D-06 — Consulta ampla não é filtro desconhecido
+
+Ausência intencional de filtros permanece uma busca exploratória válida. Somente
+um conceito explicitamente solicitado e não resolvido bloqueia o Retriever e
+gera sugestões.
+
 ## Testes planejados
 
-- contrato aceita todos os Enums e rejeita valores desconhecidos;
+- contrato aceita todos os Enums e rejeita valores desconhecidos inseridos
+  diretamente nos campos enumerados;
 - normalização ignora caixa, acentos e espaços;
 - aliases financeiros em português e inglês resolvem para
   `financial_services`;
@@ -98,7 +122,14 @@ tratado por uma especificação própria, pois altera a precisão esperada.
 - rótulos compostos são associados às categorias esperadas;
 - estágios persistidos são traduzidos corretamente;
 - portes canônicos e intervalos numéricos preservam a semântica atual;
-- saída desconhecida do modelo usa reparo e depois erro sanitizado;
+- saída que coloca um valor desconhecido diretamente em campo enumerado usa
+  reparo e depois erro sanitizado;
+- consulta sem filtros permanece `ready` e recupera resultados exploratórios;
+- filtro explícito desconhecido produz `needs_clarification` e não chama o
+  Retriever;
+- sugestões contêm três Enums distintos do campo correto, em ordem de
+  proximidade, quando houver ao menos três opções disponíveis;
+- nenhuma sugestão é aplicada automaticamente;
 - Retriever expande categorias e preserva AND entre campos;
 - consulta financeira encontra registros reais dos dois rótulos mapeados;
 - busca sem filtros continua incluindo registros não mapeados;
@@ -121,7 +152,8 @@ tratado por uma especificação própria, pois altera a precisão esperada.
 | --- | --- |
 | Taxonomia ficar desatualizada após novo CSV | Registros não mapeados continuam acessíveis sem filtro; inclusão exige mudança explícita e teste |
 | Alias amplo gerar falso positivo | Manter aliases revisados e categorias conceituais documentadas |
-| IA retornar tradução não permitida | Normalizar apenas aliases conhecidos e rejeitar o restante |
+| IA colocar tradução não permitida em campo enumerado | Exigir que o Planner use `unresolved_filters`, reparar a estrutura e rejeitar se continuar inválida |
+| Sugestões irrelevantes confundirem a pessoa | Expor como alternativas não vinculantes, preservar termo original e permitir busca textual |
 | Mudança quebrar consumidores do plano | Manter strings JSON estáveis, documentar OpenAPI e testar endpoints |
 | Rótulo composto pertencer a duas categorias | Permitir mapeamento muitos-para-muitos na taxonomia |
 
@@ -131,6 +163,20 @@ tratado por uma especificação própria, pois altera a precisão esperada.
 - normalização de localização por cidade, estado e país;
 - filtros múltiplos por startup no modelo relacional;
 - fallback progressivo e busca semântica.
+
+## Resultado da execução
+
+- A taxonomia canônica foi implementada sem alteração do schema ou dos dados
+  persistidos.
+- Aliases são normalizados na aplicação e os Enums são expandidos para igualdade
+  parametrizada no PostgreSQL, preservando os índices existentes.
+- Filtros não resolvidos bloqueiam o Retriever e retornam três sugestões
+  estruturadas e não vinculantes.
+- A integração real comprovou que `financial_services` recupera os dois rótulos
+  financeiros previstos, preservando IDs e URLs.
+- A suíte do backend, arquitetura, Ruff, mypy e import-linter passaram com
+  cobertura de 87,25%.
+- Lint, testes e build do frontend passaram.
 
 ## Sugestão de commit
 

@@ -3,12 +3,23 @@ from __future__ import annotations
 import logging
 import re
 import time
-import unicodedata
 from collections import defaultdict
 from datetime import UTC, datetime
 from uuid import UUID
 
-from app.application.contracts.query_plan import QueryPlan, QueryPlanStatus, normalize_unique
+from app.application.contracts.filter_taxonomy import (
+    CompanySize,
+    normalize_taxonomy_key,
+    persisted_sector_labels,
+    persisted_stage_labels,
+    resolve_company_sizes,
+)
+from app.application.contracts.query_plan import (
+    NumericTeamSizeRange,
+    QueryPlan,
+    QueryPlanStatus,
+    normalize_unique,
+)
 from app.application.contracts.retrieval import StartupSearchCriteria, TeamSizeRange
 from app.application.ports.repositories import StartupDocumentRepository, StartupRepository
 from app.core.config import RetrieverConfig
@@ -18,14 +29,11 @@ from app.graph.state import AppState, CandidateStartup
 
 logger = logging.getLogger(__name__)
 
-SIZE_LABELS: dict[str, TeamSizeRange] = {
-    "micro": TeamSizeRange(1, 10),
-    "small": TeamSizeRange(11, 50),
-    "pequena": TeamSizeRange(11, 50),
-    "medium": TeamSizeRange(51, 200),
-    "media": TeamSizeRange(51, 200),
-    "large": TeamSizeRange(201),
-    "grande": TeamSizeRange(201),
+SIZE_RANGES: dict[CompanySize, TeamSizeRange] = {
+    CompanySize.MICRO: TeamSizeRange(1, 10),
+    CompanySize.SMALL: TeamSizeRange(11, 50),
+    CompanySize.MEDIUM: TeamSizeRange(51, 200),
+    CompanySize.LARGE: TeamSizeRange(201),
 }
 
 
@@ -34,8 +42,8 @@ def build_search_criteria(plan: QueryPlan) -> StartupSearchCriteria:
     ranges = tuple(item for value in company_sizes if (item := parse_team_size(value)) is not None)
     text_terms = normalize_unique([*plan.filters.keywords, *plan.filters.ai_usage_signals])
     return StartupSearchCriteria(
-        sectors=tuple(value.casefold() for value in plan.filters.sectors),
-        stages=tuple(value.casefold() for value in plan.filters.stages),
+        sectors=persisted_sector_labels(plan.filters.sectors),
+        stages=persisted_stage_labels(plan.filters.stages),
         locations=tuple(value.casefold() for value in plan.filters.locations),
         text_terms=tuple(value.casefold() for value in text_terms),
         team_size_ranges=ranges,
@@ -43,15 +51,15 @@ def build_search_criteria(plan: QueryPlan) -> StartupSearchCriteria:
     )
 
 
-def parse_team_size(value: str) -> TeamSizeRange | None:
-    normalized = "".join(
-        character
-        for character in unicodedata.normalize("NFKD", value.casefold())
-        if not unicodedata.combining(character)
-    )
-    label = SIZE_LABELS.get(normalized.strip())
-    if label is not None:
-        return label
+def parse_team_size(value: CompanySize | NumericTeamSizeRange | str) -> TeamSizeRange | None:
+    if isinstance(value, NumericTeamSizeRange):
+        return TeamSizeRange(value.minimum, value.maximum)
+    if isinstance(value, CompanySize):
+        return SIZE_RANGES[value]
+    resolved = resolve_company_sizes(value)
+    if resolved:
+        return SIZE_RANGES[resolved[0]]
+    normalized = normalize_taxonomy_key(value)
     numbers = [int(item) for item in re.findall(r"\d+", normalized)]
     if len(numbers) >= 2:
         return TeamSizeRange(min(numbers[0], numbers[1]), max(numbers[0], numbers[1]))

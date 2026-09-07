@@ -9,6 +9,10 @@ A implementação foi autorizada em 6 de setembro de 2026 por solicitação
 explícita do responsável pelo projeto. As tarefas T-01 a T-18 foram executadas;
 a T-19 permanece aberta até a validação da entrega.
 
+> Evolução pela especificação 008: `sectors`, `stages` e `company_sizes`
+> passaram de texto livre para valores canônicos; filtros não resolvidos e
+> sugestões estruturadas foram adicionados ao plano.
+
 ## Contexto
 
 A fundação do backend definiu o estado compartilhado do LangGraph e o protocolo

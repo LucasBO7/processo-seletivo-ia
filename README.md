@@ -365,6 +365,14 @@ com um `QueryPlan` validado. O contrato separa setor, porte, estágio, localiza�
 palavras-chave e sinais de IA, além de definir uma estratégia `targeted`,
 `exploratory` ou `comparative`.
 
+Setor, estágio e porte usam valores canônicos publicados no OpenAPI. Sinônimos
+em português e inglês são normalizados; por exemplo, `financeiro`, `financial`,
+`fintech`, `trading` e `investimentos` resolvem para `financial_services`.
+Quando um filtro explícito não é reconhecido, o plano usa
+`needs_clarification`, preserva o termo em `unresolved_filters` e retorna três
+opções válidas em `filter_suggestions`. Nenhuma sugestão é aplicada
+automaticamente. Uma consulta realmente ampla continua `ready` sem filtros.
+
 Os status possíveis são:
 
 - `ready`: plano consumível por um futuro Retriever;
@@ -383,7 +391,7 @@ Para testar o fluxo no Postman, selecione o método `POST`, use a URL
 
 ```json
 {
-  "query": "Startups brasileiras de saúde em estágio seed usando visão computacional"
+  "query": "Liste todas as startups no meio financeiro cadastradas"
 }
 ```
 
@@ -410,6 +418,11 @@ filtros de setor, porte, estágio e localização e usa palavras-chave e sinais 
 IA para pontuar correspondências nos dados e documentos das startups. Os
 resultados são ordenados por score, nome e UUID. Documentos são carregados em
 lote e preservam UUID, URL, título e trecho em `selected_sources`.
+
+Os filtros canônicos são expandidos para os rótulos existentes sem alterar o
+banco. Assim, `financial_services` encontra tanto `Fintech / Crédito` quanto
+`SaaS de Gestão Financeira`. Dentro de um campo os rótulos usam OR; campos
+diferentes continuam combinados com AND.
 
 O limite padrão é 20 startups e o trecho padrão possui 300 caracteres,
 configuráveis por `RETRIEVER__MAX_RESULTS` e `RETRIEVER__EXCERPT_LENGTH`. Busca

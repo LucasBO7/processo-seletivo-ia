@@ -43,9 +43,9 @@ class QueryPlannerAgent:
         ]
         try:
             candidate = await self._model.complete(messages)
-            plan = self._parse(candidate, query)
+            parsed = self._parse(candidate, query)
             attempts = 0
-            while plan is None and attempts < self._config.max_repair_attempts:
+            while parsed is None and attempts < self._config.max_repair_attempts:
                 attempts += 1
                 candidate = await self._model.complete(
                     [
@@ -53,18 +53,21 @@ class QueryPlannerAgent:
                         ChatMessage(role="user", content=build_repair_message(candidate)),
                     ]
                 )
-                plan = self._parse(candidate, query)
+                parsed = self._parse(candidate, query)
         except Exception:
             return self._error_update("query_planner_unavailable", started_at, state=state)
 
-        if plan is None:
+        if parsed is None:
             return self._error_update("query_plan_invalid_output", started_at, state=state)
+        plan, filters_normalized = parsed
         limit_error = self._validate_configured_limits(plan)
         if limit_error:
             return self._error_update("query_plan_invalid_output", started_at, state=state)
 
         duration_ms = self._duration_ms(started_at)
         warnings = list(state.get("warnings", []))
+        if filters_normalized:
+            warnings.append("query_filter_normalized")
         warnings += (
             ["query_plan_needs_clarification"]
             if plan.status is QueryPlanStatus.NEEDS_CLARIFICATION
@@ -102,13 +105,17 @@ class QueryPlannerAgent:
             return "query_too_long"
         return None
 
-    def _parse(self, candidate: str, query: str) -> QueryPlan | None:
+    def _parse(self, candidate: str, query: str) -> tuple[QueryPlan, bool] | None:
         try:
             payload = json.loads(candidate)
             if not isinstance(payload, dict):
                 return None
             plan = QueryPlan.model_validate(payload)
-            return plan.model_copy(update={"normalized_query": normalize_text(query)})
+            filters_normalized = self._filters_were_normalized(payload, plan)
+            return (
+                plan.model_copy(update={"normalized_query": normalize_text(query)}),
+                filters_normalized,
+            )
         except (json.JSONDecodeError, ValidationError):
             return None
 
@@ -122,11 +129,24 @@ class QueryPlannerAgent:
             plan.filters.ai_usage_signals,
             plan.analysis_strategy.objectives,
             plan.ambiguities,
+            plan.unresolved_filters,
+            plan.filter_suggestions,
         )
         return (
             any(len(items) > self._config.max_items_per_list for items in lists)
             or len(plan.clarification_questions) > self._config.max_clarification_questions
             or len(plan.analysis_strategy.rationale) > self._config.max_rationale_length
+        )
+
+    @staticmethod
+    def _filters_were_normalized(payload: dict[str, Any], plan: QueryPlan) -> bool:
+        raw_filters = payload.get("filters")
+        if not isinstance(raw_filters, dict):
+            return False
+        canonical = plan.filters.model_dump(mode="json")
+        return any(
+            raw_filters.get(field, []) != canonical[field]
+            for field in ("sectors", "company_sizes", "stages")
         )
 
     def _error_update(
@@ -172,6 +192,8 @@ class QueryPlannerAgent:
                 plan.filters.locations,
                 plan.filters.keywords,
                 plan.filters.ai_usage_signals,
+                plan.unresolved_filters,
+                plan.filter_suggestions,
             )
         )
 

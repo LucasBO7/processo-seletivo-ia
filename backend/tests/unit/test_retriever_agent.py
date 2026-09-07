@@ -124,7 +124,7 @@ def test_builds_normalized_search_criteria_from_query_plan() -> None:
 
     criteria = build_search_criteria(plan)
 
-    assert criteria.sectors == ("fintech",)
+    assert criteria.sectors == ("fintech / crédito", "saas de gestão financeira")
     assert criteria.stages == ("seed",)
     assert criteria.locations == ("são paulo",)
     assert criteria.text_terms == ("crédito", "machine learning")

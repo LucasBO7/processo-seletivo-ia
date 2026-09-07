@@ -3,9 +3,11 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
+from app.application.contracts.filter_taxonomy import CompanySize, Sector, StartupStage
 from app.application.contracts.query_plan import (
     AnalysisMode,
     AnalysisStrategy,
+    NumericTeamSizeRange,
     QueryPlan,
     QueryPlanStatus,
     StartupSearchFilters,
@@ -32,16 +34,20 @@ def make_plan(**overrides: object) -> QueryPlan:
 
 def test_normalizes_and_deduplicates_text_without_changing_order() -> None:
     filters = StartupSearchFilters(
-        sectors=["  Saúde   digital ", "saúde digital", "FinTech", ""],
-        company_sizes=[" pequena "],
-        stages=["seed"],
+        sectors=[" financeiro ", "Financial", "FinTech"],
+        company_sizes=[" pequena ", "20-30"],
+        stages=["Série C", "series c"],
         locations=["São Paulo"],
         keywords=["computer vision"],
         ai_usage_signals=["LLM"],
     )
 
-    assert filters.sectors == ["Saúde digital", "FinTech"]
-    assert filters.company_sizes == ["pequena"]
+    assert filters.sectors == [Sector.FINANCIAL_SERVICES]
+    assert filters.company_sizes == [
+        CompanySize.SMALL,
+        NumericTeamSizeRange(minimum=20, maximum=30),
+    ]
+    assert filters.stages == [StartupStage.SERIES_C]
     assert normalize_unique([" A ", "a", " B  C "]) == ["A", "B C"]
 
 
@@ -89,6 +95,8 @@ def test_ready_rejects_clarification_and_extra_fields() -> None:
         make_plan(ambiguities=["ambígua"])
     with pytest.raises(ValidationError, match="Extra inputs"):
         make_plan(unexpected="value")
+    with pytest.raises(ValidationError):
+        make_plan(filters={"sectors": ["unknown_sector"]})
 
 
 def test_contract_limits_and_serialization() -> None:
@@ -102,3 +110,51 @@ def test_contract_limits_and_serialization() -> None:
     dumped = make_plan().model_dump(mode="json")
     assert dumped["status"] == "ready"
     assert dumped["analysis_strategy"]["mode"] == "exploratory"
+
+
+def test_unresolved_filter_requires_three_matching_enum_suggestions() -> None:
+    plan = make_plan(
+        status="needs_clarification",
+        ambiguities=["Setor não reconhecido."],
+        clarification_questions=["Qual categoria representa o setor?"],
+        unresolved_filters=[{"field": "sector", "requested_value": "agricultura espacial"}],
+        filter_suggestions=[
+            {
+                "field": "sector",
+                "requested_value": "agricultura espacial",
+                "options": ["industry_4_0", "data_and_ai", "managed_it_services"],
+            }
+        ],
+    )
+
+    assert plan.filter_suggestions[0].options == [
+        Sector.INDUSTRY_4_0,
+        Sector.DATA_AND_AI,
+        Sector.MANAGED_IT_SERVICES,
+    ]
+
+
+@pytest.mark.parametrize(
+    "suggestion",
+    [
+        {
+            "field": "sector",
+            "requested_value": "desconhecido",
+            "options": ["seed", "series_a", "growth"],
+        },
+        {
+            "field": "sector",
+            "requested_value": "desconhecido",
+            "options": ["data_and_ai", "data_and_ai", "industry_4_0"],
+        },
+    ],
+)
+def test_rejects_invalid_filter_suggestions(suggestion: dict[str, object]) -> None:
+    with pytest.raises(ValidationError):
+        make_plan(
+            status="needs_clarification",
+            ambiguities=["Setor não reconhecido."],
+            clarification_questions=["Qual categoria?"],
+            unresolved_filters=[{"field": "sector", "requested_value": "desconhecido"}],
+            filter_suggestions=[suggestion],
+        )
