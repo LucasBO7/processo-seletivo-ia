@@ -19,6 +19,7 @@ from app.core.resources import ApplicationResources
 from app.graph.agents.extractor import create_extractor_agent
 from app.graph.agents.query_planner import create_query_planner_agent
 from app.graph.agents.retriever import RetrieverAgent
+from app.graph.agents.startup_classifier import create_startup_classifier_agent
 from app.graph.builder import compile_analysis_workflow
 from app.graph.model_policy import ModelProfile, ModelRegistry
 from app.infrastructure.persistence.database import (
@@ -69,8 +70,14 @@ async def create_resources(settings: Settings) -> ApplicationResources:
         config=settings.retriever,
     )
     extractor = create_extractor_agent(registry=model_registry, config=settings.extractor)
+    startup_classifier = create_startup_classifier_agent(
+        registry=model_registry, config=settings.startup_classifier
+    )
     workflow = compile_analysis_workflow(
-        query_planner=query_planner, retriever=retriever, extractor=extractor
+        query_planner=query_planner,
+        retriever=retriever,
+        extractor=extractor,
+        startup_classifier=startup_classifier,
     )
     qdrant = create_qdrant_client(settings.qdrant)
     try:
@@ -90,6 +97,7 @@ async def create_resources(settings: Settings) -> ApplicationResources:
         model_registry=model_registry,
         query_planner=query_planner,
         extractor=extractor,
+        startup_classifier=startup_classifier,
         workflow=workflow,
     )
 

@@ -96,6 +96,17 @@ class ExtractorConfig(BaseModel):
     max_repair_attempts: int = Field(default=1, ge=0, le=1)
 
 
+class StartupClassifierConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    max_sources_per_startup: int = Field(default=10, ge=1, le=50)
+    max_context_characters: int = Field(default=12_000, ge=100, le=100_000)
+    max_justification_length: int = Field(default=1_000, ge=50, le=4_000)
+    max_signals: int = Field(default=20, ge=1, le=50)
+    max_signal_description_length: int = Field(default=500, ge=50, le=2_000)
+    max_repair_attempts: int = Field(default=1, ge=0, le=1)
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=BACKEND_ROOT / ".env",
@@ -116,6 +127,7 @@ class Settings(BaseSettings):
     query_planner: QueryPlannerConfig = QueryPlannerConfig()
     retriever: RetrieverConfig = RetrieverConfig()
     extractor: ExtractorConfig = ExtractorConfig()
+    startup_classifier: StartupClassifierConfig = StartupClassifierConfig()
     embeddings: ModelProviderConfig = Field(
         default_factory=lambda: ModelProviderConfig(provider="unset", model="unset")
     )

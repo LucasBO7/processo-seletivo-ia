@@ -3,10 +3,10 @@ from __future__ import annotations
 from typing import Any, TypedDict
 from uuid import UUID
 
+from app.application.contracts.classification import StartupClassification
 from app.application.contracts.extraction import StructuredStartupProfile
 from app.application.contracts.query_plan import QueryPlan
 from app.domain.models import (
-    AIMaturity,
     Evidence,
     Recommendation,
     RecoverableError,
@@ -19,13 +19,6 @@ class CandidateStartup(TypedDict):
     startup_id: UUID
     name: str
     score: float | None
-
-
-class StartupClassification(TypedDict):
-    startup_id: UUID
-    maturity: AIMaturity
-    rationale: str
-    source_ids: list[UUID]
 
 
 class RetrievedChunk(TypedDict):

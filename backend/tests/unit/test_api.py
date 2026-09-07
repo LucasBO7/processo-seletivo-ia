@@ -10,6 +10,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.api.app import create_app
+from app.application.contracts.classification import (
+    ClassificationStatus,
+    ConfidenceLevel,
+    StartupClassification,
+)
 from app.application.contracts.extraction import StructuredStartupProfile
 from app.application.contracts.query_plan import QueryPlan
 from app.application.ports.providers import ChatModel, ChatModelError, ChatModelErrorCode
@@ -187,6 +192,16 @@ def test_search_returns_workflow_plan_candidates_and_sources(settings: Settings)
                     ],
                 )
             ],
+            classifications=[
+                StartupClassification(
+                    startup_id=startup_id,
+                    name="Startup One",
+                    status=ClassificationStatus.UNCERTAIN,
+                    category=None,
+                    justification="Insufficient evidence.",
+                    confidence=ConfidenceLevel.LOW,
+                )
+            ],
             warnings=[],
             errors=[],
             metrics={"query_planner_duration_ms": 1.0, "retriever_duration_ms": 2.0},
@@ -209,6 +224,8 @@ def test_search_returns_workflow_plan_candidates_and_sources(settings: Settings)
     assert body["selected_sources"][0]["source_url"] == "https://example.com/source"
     assert body["structured_profiles"][0]["startup_id"] == str(startup_id)
     assert body["structured_profiles"][0]["name"] == "Startup One"
+    assert body["classifications"][0]["status"] == "uncertain"
+    assert body["classifications"][0]["category"] is None
     assert workflow.calls[0]["correlation_id"] == "search-123"
     assert workflow.calls[0]["query"] == "startups"
 
@@ -345,6 +362,8 @@ def test_search_treats_empty_retrieval_as_success(settings: Settings) -> None:
         ("retriever_unavailable", 503),
         ("extractor_invalid_output", 502),
         ("extractor_unavailable", 503),
+        ("classifier_invalid_output", 502),
+        ("classifier_unavailable", 503),
     ],
 )
 def test_search_maps_recoverable_errors(
@@ -404,6 +423,10 @@ def test_openapi_exposes_current_functional_routes(client: TestClient) -> None:
     assert "ExtractedFact" in schemas
     assert "ExtractionSource" in schemas
     assert "ProfileField" in schemas
+    assert "StartupClassification" in schemas
+    assert "ClassificationStatus" in schemas
+    assert "ConfidenceLevel" in schemas
+    assert "ClassificationSignalType" in schemas
 
 
 @pytest.mark.parametrize("path", ["/health/live", "/health/ready"])

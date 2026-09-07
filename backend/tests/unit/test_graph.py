@@ -6,11 +6,13 @@ from uuid import uuid4
 
 import pytest
 
+from app.application.contracts.extraction import ProfileField, StructuredStartupProfile
 from app.application.contracts.query_plan import QueryPlan
 from app.domain.models import Evidence, RecoverableError, SourceReference
 from app.graph.builder import (
     compile_analysis_workflow,
     create_graph_builder,
+    route_after_extractor,
     route_after_query_planner,
     route_after_retriever,
 )
@@ -76,9 +78,15 @@ def test_builder_registers_current_nodes() -> None:
         query_planner=RecordingNode(AppState()),
         retriever=RecordingNode(AppState()),
         extractor=RecordingNode(AppState()),
+        startup_classifier=RecordingNode(AppState()),
     )
 
-    assert set(builder.nodes) == {"query_planner", "retriever", "extractor"}
+    assert set(builder.nodes) == {
+        "query_planner",
+        "retriever",
+        "extractor",
+        "startup_classifier",
+    }
 
 
 @pytest.mark.parametrize(
@@ -125,6 +133,18 @@ def test_route_after_retriever_requires_attributable_source() -> None:
     )
 
 
+def test_route_after_extractor_requires_profile() -> None:
+    profile = StructuredStartupProfile(
+        startup_id=uuid4(),
+        name="Acme",
+        unknown_fields=list(ProfileField),
+    )
+
+    assert route_after_extractor(AppState(structured_profiles=[profile])) == "classify"
+    assert route_after_extractor(AppState(structured_profiles=[])) == "stop"
+    assert route_after_extractor(AppState()) == "stop"
+
+
 @pytest.mark.asyncio
 async def test_workflow_runs_retriever_and_preserves_traceable_state() -> None:
     startup_id = uuid4()
@@ -151,8 +171,12 @@ async def test_workflow_runs_retriever_and_preserves_traceable_state() -> None:
         )
     )
     extractor = RecordingNode(AppState())
+    startup_classifier = RecordingNode(AppState())
     workflow = compile_analysis_workflow(
-        query_planner=planner, retriever=retriever, extractor=extractor
+        query_planner=planner,
+        retriever=retriever,
+        extractor=extractor,
+        startup_classifier=startup_classifier,
     )
 
     result = await workflow.ainvoke(
@@ -161,6 +185,7 @@ async def test_workflow_runs_retriever_and_preserves_traceable_state() -> None:
 
     assert len(retriever.calls) == 1
     assert len(extractor.calls) == 1
+    assert startup_classifier.calls == []
     assert retriever.calls[0]["query_plan"] == query_plan()
     assert result["candidate_startups"][0]["startup_id"] == startup_id
     assert result["selected_sources"][0].source_id == source.source_id
@@ -170,13 +195,54 @@ async def test_workflow_runs_retriever_and_preserves_traceable_state() -> None:
 
 
 @pytest.mark.asyncio
+async def test_workflow_runs_classifier_only_after_extractor_profile() -> None:
+    startup_id = uuid4()
+    profile = StructuredStartupProfile(
+        startup_id=startup_id,
+        name="Acme",
+        unknown_fields=list(ProfileField),
+    )
+    source = SourceReference(
+        startup_id=startup_id,
+        source_id=uuid4(),
+        source_url="https://example.com/acme",
+        title="Acme",
+        excerpt="Evidence",
+    )
+    planner = RecordingNode(AppState(query_plan=query_plan()))
+    retriever = RecordingNode(
+        AppState(
+            candidate_startups=[{"startup_id": startup_id, "name": "Acme", "score": 1.0}],
+            selected_sources=[source],
+        )
+    )
+    extractor = RecordingNode(AppState(structured_profiles=[profile]))
+    startup_classifier = RecordingNode(AppState())
+    workflow = compile_analysis_workflow(
+        query_planner=planner,
+        retriever=retriever,
+        extractor=extractor,
+        startup_classifier=startup_classifier,
+    )
+
+    await workflow.ainvoke(empty_state(run_id=uuid4(), correlation_id="classify", query="startups"))
+
+    assert len(startup_classifier.calls) == 1
+    assert startup_classifier.calls[0]["structured_profiles"] == [profile]
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("status", ["needs_clarification", "invalid"])
 async def test_workflow_stops_before_retriever_for_non_ready_plan(status: str) -> None:
     planner = RecordingNode(AppState(query_plan=query_plan(status)))
     retriever = RecordingNode(AppState())
     extractor = RecordingNode(AppState())
+    startup_classifier = RecordingNode(AppState())
     workflow = compile_analysis_workflow(
-        query_planner=planner, retriever=retriever, extractor=extractor
+        query_planner=planner,
+        retriever=retriever,
+        extractor=extractor,
+        startup_classifier=startup_classifier,
     )
 
     result = await workflow.ainvoke(
@@ -196,8 +262,12 @@ async def test_workflow_stops_before_retriever_when_planner_fails() -> None:
     planner = RecordingNode(AppState(errors=[planner_error]))
     retriever = RecordingNode(AppState())
     extractor = RecordingNode(AppState())
+    startup_classifier = RecordingNode(AppState())
     workflow = compile_analysis_workflow(
-        query_planner=planner, retriever=retriever, extractor=extractor
+        query_planner=planner,
+        retriever=retriever,
+        extractor=extractor,
+        startup_classifier=startup_classifier,
     )
 
     result = await workflow.ainvoke(
@@ -213,8 +283,12 @@ async def test_workflow_invocations_do_not_share_mutable_state() -> None:
     planner = RecordingNode(AppState(query_plan=query_plan()))
     retriever = RecordingNode(AppState())
     extractor = RecordingNode(AppState())
+    startup_classifier = RecordingNode(AppState())
     workflow = compile_analysis_workflow(
-        query_planner=planner, retriever=retriever, extractor=extractor
+        query_planner=planner,
+        retriever=retriever,
+        extractor=extractor,
+        startup_classifier=startup_classifier,
     )
 
     first = await workflow.ainvoke(

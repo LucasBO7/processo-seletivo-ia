@@ -354,6 +354,7 @@ Todas as chaves aceitas e valores locais não sensíveis estão em `backend/.env
 | `QUERY_PLANNER__` | limites de consulta, listas, perguntas, justificativa e reparo |
 | `RETRIEVER__` | limite de startups retornadas e tamanho do trecho de evidência |
 | `EXTRACTOR__` | limites de fontes, contexto, fatos, listas e reparo da extração |
+| `STARTUP_CLASSIFIER__` | limites de fontes, contexto, justificativa, sinais e reparo da classificação |
 | `EMBEDDINGS__` | futuro modelo de embeddings |
 | `RERANKER__` | adaptador de reranking Cohere |
 
@@ -454,7 +455,26 @@ Busca sem fontes apropriadas encerra após o Retriever com HTTP 200 e o aviso
 `retriever_no_sources`. Saída inválida do Extractor usa HTTP 502 e
 indisponibilidade do modelo usa HTTP 503.
 
-### 7.7. Qualidade e testes do backend
+### 7.7. Startup Classifier Agent
+
+Quando o Extractor produz ao menos um perfil válido, o LangGraph executa o
+Startup Classifier. Cada resultado informa `classified` ou `uncertain`, categoria
+`ai-native`, `ai-enabled`, `non-ai` ou `null`, justificativa, confiança, sinais e
+referências das evidências utilizadas.
+
+`ai-native` exige evidência de que a IA é indispensável ao produto principal;
+`ai-enabled` exige um uso concreto de IA que habilita ou melhora uma oferta mais
+ampla; `non-ai` exige evidência positiva e explícita de não uso de IA. A simples
+ausência de menções a IA gera `uncertain`, nunca `non-ai`. Conflito, menção
+genérica, intenção futura ou impossibilidade de distinguir IA central de
+habilitadora também preservam a incerteza.
+
+O agente usa `llm_heavy`, considera apenas o perfil e os excerpts associados à
+mesma startup e não altera afirmações do Extractor. Ele não valida fatos
+definitivamente, não consulta a base NVIDIA e não faz recomendações. Os limites
+operacionais usam o prefixo `STARTUP_CLASSIFIER__`.
+
+### 7.8. Qualidade e testes do backend
 
 Execute cada verificação separadamente:
 

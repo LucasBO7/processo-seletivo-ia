@@ -77,6 +77,7 @@ class StubResources:
             config=QueryPlannerConfig(),
         )
         self.extractor = None
+        self.startup_classifier = None
         self.workflow = workflow or StubWorkflow()
         self.closed = False
 

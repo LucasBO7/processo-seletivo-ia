@@ -36,6 +36,9 @@ def test_settings_parse_nested_values() -> None:
     assert settings.extractor.max_sources_per_startup == 10
     assert settings.extractor.max_context_characters == 12_000
     assert settings.extractor.max_repair_attempts == 1
+    assert settings.startup_classifier.max_sources_per_startup == 10
+    assert settings.startup_classifier.max_context_characters == 12_000
+    assert settings.startup_classifier.max_repair_attempts == 1
 
 
 def test_retriever_limits_parse_environment(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -62,6 +65,19 @@ def test_extractor_limits_parse_environment(monkeypatch: pytest.MonkeyPatch) -> 
 
     assert settings.extractor.max_sources_per_startup == 5
     assert settings.extractor.max_context_characters == 5_000
+
+
+def test_classifier_limits_parse_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("STARTUP_CLASSIFIER__MAX_SIGNALS", "7")
+    monkeypatch.setenv("STARTUP_CLASSIFIER__MAX_JUSTIFICATION_LENGTH", "700")
+    settings = Settings(
+        _env_file=None,
+        postgres={"url": "postgresql+psycopg://user:secret@localhost/database"},
+        qdrant={"url": "http://localhost:6333"},
+    )
+
+    assert settings.startup_classifier.max_signals == 7
+    assert settings.startup_classifier.max_justification_length == 700
 
 
 def test_query_planner_limits_parse_environment(monkeypatch: pytest.MonkeyPatch) -> None:

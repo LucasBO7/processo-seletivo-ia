@@ -322,3 +322,9 @@ passarem e a entrega receber aprovação explícita.
 ## Sugestão de commit
 
 `feat(extractor): structure startup profiles from retrieved sources`
+
+## Evolução posterior
+
+A especificação 010 substitui o encerramento direto após o Extractor por
+`Extractor → Startup Classifier/END`. O Classifier usa os perfis e as fontes sem
+alterar as afirmações extraídas.

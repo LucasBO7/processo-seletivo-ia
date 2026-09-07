@@ -169,3 +169,8 @@ status incluirá `extractor_invalid_output → 502` e
 ## Sugestão de commit
 
 `feat(extractor): structure startup profiles from retrieved sources`
+
+## Evolução posterior
+
+A especificação 010 implementa a aresta Extractor → Startup Classifier e mantém
+o encerramento em `END` após a classificação.

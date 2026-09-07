@@ -14,6 +14,7 @@ from app.domain.models import KnowledgeChunk, KnowledgeDocument, Startup, Startu
 from app.graph.agents.extractor import ExtractorAgent
 from app.graph.agents.query_planner import create_query_planner_agent
 from app.graph.agents.retriever import RetrieverAgent
+from app.graph.agents.startup_classifier import StartupClassifierAgent
 from app.graph.builder import compile_analysis_workflow
 from app.graph.model_policy import ModelRegistry
 from app.graph.state import empty_state
@@ -181,6 +182,20 @@ async def test_schema_repositories_and_qdrant_are_consistent() -> None:
                 ),
                 config=settings.extractor,
             ),
+            startup_classifier=StartupClassifierAgent(
+                model=FakeChatModel(
+                    json.dumps(
+                        {
+                            "status": "uncertain",
+                            "category": None,
+                            "justification": "The evidence does not establish AI usage.",
+                            "confidence": "low",
+                            "signals": [],
+                        }
+                    )
+                ),
+                config=settings.startup_classifier,
+            ),
         )
         workflow_result = await workflow.ainvoke(
             empty_state(
@@ -210,6 +225,13 @@ async def test_schema_repositories_and_qdrant_are_consistent() -> None:
             for profile in workflow_result["structured_profiles"]
             for claim in profile.claims
         } == {evidence.id, financial_management_evidence.id}
+        assert {
+            classification.startup_id for classification in workflow_result["classifications"]
+        } == {startup.id, financial_management.id}
+        assert all(
+            classification.status.value == "uncertain"
+            for classification in workflow_result["classifications"]
+        )
 
         async with engine.connect() as connection:
             startup_indexes = await connection.run_sync(

@@ -23,6 +23,7 @@ class ApplicationResources:
     model_registry: ModelRegistry
     query_planner: GraphNode
     extractor: GraphNode
+    startup_classifier: GraphNode
     workflow: AnalysisWorkflow
 
     async def close(self) -> None:
