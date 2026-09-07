@@ -6,6 +6,7 @@ from app.api.app import create_model_registry, create_resources
 from app.application.ports.providers import ChatMessage, ChatModel, RankedDocument
 from app.core.config import LLMProfileConfig, Settings
 from app.graph.model_policy import ModelProfile, ModelRegistry
+from app.graph.state import AppState
 from tests.fakes.providers import FakeChatModel, FakeEmbeddingModel, FakeReranker
 
 
@@ -52,6 +53,20 @@ async def test_application_resources_expose_the_shared_models(
     fast = FakeChatModel("fast")
     heavy = FakeChatModel("heavy")
     registry = ModelRegistry(llm_fast=fast, llm_heavy=heavy)
+    workflow_calls = 0
+    compiled_query_planner: object | None = None
+
+    class StubWorkflow:
+        async def ainvoke(self, state: AppState) -> AppState:
+            return state
+
+    workflow = StubWorkflow()
+
+    def compile_workflow(**components: object) -> StubWorkflow:
+        nonlocal compiled_query_planner, workflow_calls
+        workflow_calls += 1
+        compiled_query_planner = components["query_planner"]
+        return workflow
 
     class StubEngine:
         async def dispose(self) -> None:
@@ -71,6 +86,7 @@ async def test_application_resources_expose_the_shared_models(
     monkeypatch.setattr("app.api.app.ensure_collection", ensure_collection)
     monkeypatch.setattr("app.api.app.DatabaseReadinessProbe", lambda _: object())
     monkeypatch.setattr("app.api.app.QdrantReadinessProbe", lambda _: object())
+    monkeypatch.setattr("app.api.app.compile_analysis_workflow", compile_workflow)
     settings = Settings(
         _env_file=None,
         postgres={"url": "postgresql+psycopg://user:password@localhost/database"},
@@ -83,3 +99,6 @@ async def test_application_resources_expose_the_shared_models(
     assert resources.llm_fast is fast
     assert resources.llm_heavy is heavy
     assert resources.model_registry is registry
+    assert resources.query_planner is compiled_query_planner
+    assert resources.workflow is workflow
+    assert workflow_calls == 1

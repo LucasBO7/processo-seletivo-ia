@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from app.application.ports.health import ReadinessProbe
 from app.application.ports.providers import ChatModel
+from app.graph.contracts import AnalysisWorkflow, GraphNode
 from app.graph.model_policy import ModelRegistry
 
 
@@ -20,6 +21,8 @@ class ApplicationResources:
     llm_fast: ChatModel
     llm_heavy: ChatModel
     model_registry: ModelRegistry
+    query_planner: GraphNode
+    workflow: AnalysisWorkflow
 
     async def close(self) -> None:
         await self.qdrant.close()

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from uuid import uuid4
 
@@ -10,6 +11,11 @@ from sqlalchemy import inspect
 from app.application.contracts.retrieval import StartupSearchCriteria
 from app.core.config import Settings
 from app.domain.models import KnowledgeChunk, KnowledgeDocument, Startup, StartupDocument
+from app.graph.agents.query_planner import create_query_planner_agent
+from app.graph.agents.retriever import RetrieverAgent
+from app.graph.builder import compile_analysis_workflow
+from app.graph.model_policy import ModelRegistry
+from app.graph.state import empty_state
 from app.infrastructure.persistence.database import create_engine, create_session_factory
 from app.infrastructure.persistence.repositories import (
     SqlAlchemyKnowledgeChunkRepository,
@@ -18,6 +24,7 @@ from app.infrastructure.persistence.repositories import (
     SqlAlchemyStartupRepository,
 )
 from app.infrastructure.vector.qdrant import create_qdrant_client, ensure_collection
+from tests.fakes.providers import FakeChatModel
 
 pytestmark = pytest.mark.integration
 
@@ -80,6 +87,49 @@ async def test_schema_repositories_and_qdrant_are_consistent() -> None:
         assert ranked[0].startup.id == startup.id
         assert ranked[0].score == 4.0
         assert (await startup_document_repository.list_for_startups([startup.id]))[0] == evidence
+
+        model = FakeChatModel(
+            json.dumps(
+                {
+                    "status": "ready",
+                    "normalized_query": f"startup {suffix}",
+                    "filters": {
+                        "sectors": [f"Sector {suffix}"],
+                        "stages": ["Seed"],
+                        "locations": ["Brasil"],
+                        "keywords": [suffix],
+                    },
+                    "analysis_strategy": {
+                        "mode": "targeted",
+                        "objectives": ["encontrar a startup de integração"],
+                        "rationale": "Consulta com critérios suficientes.",
+                    },
+                    "ambiguities": [],
+                    "clarification_questions": [],
+                }
+            )
+        )
+        workflow = compile_analysis_workflow(
+            query_planner=create_query_planner_agent(
+                registry=ModelRegistry(llm_fast=model, llm_heavy=model),
+                config=settings.query_planner,
+            ),
+            retriever=RetrieverAgent(
+                startups=startup_repository,
+                documents=startup_document_repository,
+                config=settings.retriever,
+            ),
+        )
+        workflow_result = await workflow.ainvoke(
+            empty_state(
+                run_id=uuid4(),
+                correlation_id=f"integration-{suffix}",
+                query=f"startup {suffix}",
+            )
+        )
+        assert workflow_result["candidate_startups"][0]["startup_id"] == startup.id
+        assert workflow_result["selected_sources"][0].source_id == evidence.id
+        assert workflow_result["selected_sources"][0].source_url == evidence.source_url
 
         async with engine.connect() as connection:
             startup_indexes = await connection.run_sync(

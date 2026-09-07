@@ -2,9 +2,8 @@
 
 ## Status
 
-Proposta.
-
-Esta especificação precisa de aprovação explícita antes da implementação.
+Implementada e validada tecnicamente em 6 de setembro de 2026. Aguardando
+aprovação explícita da entrega para conclusão formal.
 
 ## Contexto
 

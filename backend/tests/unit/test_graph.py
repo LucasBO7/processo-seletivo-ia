@@ -4,8 +4,15 @@ import json
 from dataclasses import asdict
 from uuid import uuid4
 
-from app.domain.models import Evidence, SourceReference
-from app.graph.builder import create_graph_builder
+import pytest
+
+from app.application.contracts.query_plan import QueryPlan
+from app.domain.models import Evidence, RecoverableError, SourceReference
+from app.graph.builder import (
+    compile_analysis_workflow,
+    create_graph_builder,
+    route_after_query_planner,
+)
 from app.graph.nodes import ALL_NODE_NAMES, NodeName
 from app.graph.state import AppState, empty_state
 
@@ -34,7 +41,144 @@ def test_state_accepts_partial_updates_and_traceable_evidence() -> None:
     assert "corr-1" in encoded
 
 
-def test_builder_is_empty_until_a_functional_spec_adds_nodes() -> None:
-    builder = create_graph_builder()
+class RecordingNode:
+    def __init__(self, update: AppState) -> None:
+        self.update = update
+        self.calls: list[AppState] = []
 
-    assert builder.nodes == {}
+    async def __call__(self, state: AppState) -> AppState:
+        self.calls.append(state.copy())
+        return self.update
+
+
+def query_plan(status: str = "ready") -> QueryPlan:
+    needs_clarification = status == "needs_clarification"
+    return QueryPlan.model_validate(
+        {
+            "status": status,
+            "normalized_query": "startups",
+            "filters": {},
+            "analysis_strategy": {
+                "mode": "exploratory",
+                "objectives": ["descobrir startups"],
+                "rationale": "Consulta executável.",
+            },
+            "ambiguities": ["setor"] if needs_clarification else [],
+            "clarification_questions": ["Qual setor?"] if needs_clarification else [],
+        }
+    )
+
+
+def test_builder_registers_current_nodes() -> None:
+    builder = create_graph_builder(
+        query_planner=RecordingNode(AppState()),
+        retriever=RecordingNode(AppState()),
+    )
+
+    assert set(builder.nodes) == {"query_planner", "retriever"}
+
+
+@pytest.mark.parametrize(
+    ("state", "expected"),
+    [
+        (AppState(query_plan=query_plan()), "retrieve"),
+        (AppState(query_plan=query_plan("needs_clarification")), "stop"),
+        (AppState(query_plan=query_plan("invalid")), "stop"),
+        (AppState(), "stop"),
+        (
+            AppState(
+                query_plan=query_plan(),
+                errors=[RecoverableError("query_planner_unavailable", "unavailable")],
+            ),
+            "stop",
+        ),
+    ],
+)
+def test_route_after_query_planner(state: AppState, expected: str) -> None:
+    assert route_after_query_planner(state) == expected
+
+
+@pytest.mark.asyncio
+async def test_workflow_runs_retriever_and_preserves_traceable_state() -> None:
+    startup_id = uuid4()
+    source = SourceReference(
+        source_id=uuid4(), source_url="https://example.com/evidence", title="Evidence"
+    )
+    planner = RecordingNode(
+        AppState(
+            query_plan=query_plan(),
+            warnings=["planner_warning"],
+            metrics={"query_planner_duration_ms": 1.0},
+        )
+    )
+    retriever = RecordingNode(
+        AppState(
+            candidate_startups=[{"startup_id": startup_id, "name": "Acme", "score": 2.0}],
+            selected_sources=[source],
+            warnings=["planner_warning"],
+            metrics={"query_planner_duration_ms": 1.0, "retriever_duration_ms": 2.0},
+        )
+    )
+    workflow = compile_analysis_workflow(query_planner=planner, retriever=retriever)
+
+    result = await workflow.ainvoke(
+        empty_state(run_id=uuid4(), correlation_id="corr-workflow", query="startups")
+    )
+
+    assert len(retriever.calls) == 1
+    assert retriever.calls[0]["query_plan"] == query_plan()
+    assert result["candidate_startups"][0]["startup_id"] == startup_id
+    assert result["selected_sources"][0].source_id == source.source_id
+    assert result["selected_sources"][0].source_url == source.source_url
+    assert result["warnings"] == ["planner_warning"]
+    assert result["metrics"]["retriever_duration_ms"] == 2.0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", ["needs_clarification", "invalid"])
+async def test_workflow_stops_before_retriever_for_non_ready_plan(status: str) -> None:
+    planner = RecordingNode(AppState(query_plan=query_plan(status)))
+    retriever = RecordingNode(AppState())
+    workflow = compile_analysis_workflow(query_planner=planner, retriever=retriever)
+
+    result = await workflow.ainvoke(
+        empty_state(run_id=uuid4(), correlation_id="corr-stop", query="consulta")
+    )
+
+    assert result["query_plan"].status.value == status
+    assert retriever.calls == []
+
+
+@pytest.mark.asyncio
+async def test_workflow_stops_before_retriever_when_planner_fails() -> None:
+    planner_error = RecoverableError(
+        "query_planner_unavailable", "Planner unavailable", "query_planner"
+    )
+    planner = RecordingNode(AppState(errors=[planner_error]))
+    retriever = RecordingNode(AppState())
+    workflow = compile_analysis_workflow(query_planner=planner, retriever=retriever)
+
+    result = await workflow.ainvoke(
+        empty_state(run_id=uuid4(), correlation_id="corr-error", query="consulta")
+    )
+
+    assert result["errors"] == [planner_error]
+    assert retriever.calls == []
+
+
+@pytest.mark.asyncio
+async def test_workflow_invocations_do_not_share_mutable_state() -> None:
+    planner = RecordingNode(AppState(query_plan=query_plan()))
+    retriever = RecordingNode(AppState())
+    workflow = compile_analysis_workflow(query_planner=planner, retriever=retriever)
+
+    first = await workflow.ainvoke(
+        empty_state(run_id=uuid4(), correlation_id="first", query="first")
+    )
+    first["warnings"].append("local-change")
+    second = await workflow.ainvoke(
+        empty_state(run_id=uuid4(), correlation_id="second", query="second")
+    )
+
+    assert second["correlation_id"] == "second"
+    assert second["warnings"] == []

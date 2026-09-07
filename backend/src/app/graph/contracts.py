@@ -9,3 +9,9 @@ class GraphNode(Protocol):
     async def __call__(self, state: AppState) -> AppState:
         """Return only the state fields updated by this node."""
         ...
+
+
+class AnalysisWorkflow(Protocol):
+    async def ainvoke(self, state: AppState) -> AppState:
+        """Execute an analysis from an independent initial state."""
+        ...

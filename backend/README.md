@@ -36,7 +36,7 @@ itens por lista, perguntas de esclarecimento, justificativa e tentativas de
 reparo. O agente não acessa PostgreSQL, Qdrant ou SDKs concretos e é exposto por
 `POST /api/v1/query-plans`. A rota aceita `{"query": "..."}` e devolve o plano,
 avisos, erros recuperáveis e métricas. Ela ainda não conecta o restante do
-pipeline. As rotas iniciais `/health/live` e `/health/ready` foram removidas pela
+pipeline por si só. As rotas iniciais `/health/live` e `/health/ready` foram removidas pela
 especificação 005.
 
 ## Retriever
@@ -50,4 +50,16 @@ score textual. A ordenação usa score, nome e UUID para permanecer determiníst
 As saídas usam `candidate_startups` e `selected_sources`, preservando UUIDs e
 URLs. Os limites `RETRIEVER__MAX_RESULTS` e `RETRIEVER__EXCERPT_LENGTH` controlam
 quantidade de candidatos e tamanho dos trechos. O agente ainda não possui rota
-HTTP nem está conectado ao grafo completo.
+HTTP isolada.
+
+## Orquestração disponível
+
+O workflow compilado conecta `START → query_planner → retriever → END`. O
+Retriever é chamado somente para planos `ready`; ambiguidade, consulta inválida
+ou falha do Planner encerram o fluxo antes do PostgreSQL. O grafo é criado uma
+vez no lifespan, não utiliza checkpointer e recebe um estado novo por requisição.
+
+`POST /api/v1/search` aceita `{"query": "..."}` e devolve `query_plan`,
+`candidate_startups`, `selected_sources`, avisos, erros e métricas. UUIDs e URLs
+das fontes são preservados. A rota `/api/v1/query-plans` permanece disponível
+para executar somente o Planner.

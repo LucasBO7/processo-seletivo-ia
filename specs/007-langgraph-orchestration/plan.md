@@ -95,6 +95,15 @@ divergência entre as rotas de planejamento e busca.
 - Persistência de execuções e estados intermediários.
 - Endpoint único para a pipeline completa.
 
+## Resultado da execução
+
+- O fluxo foi implementado sem desvios de escopo e termina após o Retriever.
+- O mapeamento HTTP compartilhado ficou em `app.api.status`.
+- A suíte unitária, arquitetura, Ruff, mypy e import-linter passaram.
+- A cobertura final do backend foi 86,42%, acima do mínimo de 80%.
+- A integração PostgreSQL real com modelo falso passou.
+- Lint, testes e build do frontend passaram.
+
 ## Sugestão de commit
 
 `feat(graph): orchestrate query planner and retriever workflow`

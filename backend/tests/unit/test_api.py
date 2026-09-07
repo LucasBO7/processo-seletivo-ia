@@ -4,15 +4,19 @@ import json
 from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import cast
+from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app.api.app import create_app
+from app.application.contracts.query_plan import QueryPlan
 from app.application.ports.providers import ChatModel, ChatModelError, ChatModelErrorCode
 from app.core.config import Settings
 from app.core.resources import ApplicationResources
-from tests.conftest import StubResources
+from app.domain.models import RecoverableError, SourceReference
+from app.graph.state import AppState
+from tests.conftest import StubResources, StubWorkflow
 from tests.fakes.providers import FakeChatModel, SequenceChatModel
 
 
@@ -36,6 +40,18 @@ def plan_response(**overrides: object) -> str:
 @contextmanager
 def client_with_model(settings: Settings, model: ChatModel) -> Iterator[TestClient]:
     resources = StubResources(model)
+
+    async def factory(_: Settings) -> ApplicationResources:
+        return cast(ApplicationResources, resources)
+
+    app = create_app(settings, resource_factory=factory)
+    with TestClient(app, raise_server_exceptions=False) as client:
+        yield client
+
+
+@contextmanager
+def client_with_workflow(settings: Settings, workflow: StubWorkflow) -> Iterator[TestClient]:
+    resources = StubResources(workflow=workflow)
 
     async def factory(_: Settings) -> ApplicationResources:
         return cast(ApplicationResources, resources)
@@ -136,6 +152,146 @@ def test_correlation_id_is_propagated(client: TestClient) -> None:
     assert response.headers["X-Correlation-ID"] == "request-123"
 
 
+def test_search_returns_workflow_plan_candidates_and_sources(settings: Settings) -> None:
+    startup_id = uuid4()
+    source_id = uuid4()
+    workflow = StubWorkflow(
+        AppState(
+            query_plan=QueryPlan.model_validate_json(plan_response()),
+            candidate_startups=[{"startup_id": startup_id, "name": "Startup One", "score": 3.0}],
+            selected_sources=[
+                SourceReference(
+                    source_id=source_id,
+                    source_url="https://example.com/source",
+                    title="Official source",
+                    excerpt="Public evidence",
+                )
+            ],
+            warnings=[],
+            errors=[],
+            metrics={"query_planner_duration_ms": 1.0, "retriever_duration_ms": 2.0},
+        )
+    )
+
+    with client_with_workflow(settings, workflow) as client:
+        response = client.post(
+            "/api/v1/search",
+            json={"query": "startups"},
+            headers={"X-Correlation-ID": "search-123"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["query_plan"]["status"] == "ready"
+    assert body["candidate_startups"][0]["startup_id"] == str(startup_id)
+    assert body["selected_sources"][0]["source_id"] == str(source_id)
+    assert body["selected_sources"][0]["source_url"] == "https://example.com/source"
+    assert workflow.calls[0]["correlation_id"] == "search-123"
+    assert workflow.calls[0]["query"] == "startups"
+
+
+def test_search_reuses_one_workflow_during_application_lifespan(settings: Settings) -> None:
+    workflow = StubWorkflow()
+    resources = StubResources(workflow=workflow)
+    factory_calls = 0
+
+    async def factory(_: Settings) -> ApplicationResources:
+        nonlocal factory_calls
+        factory_calls += 1
+        return cast(ApplicationResources, resources)
+
+    app = create_app(settings, resource_factory=factory)
+    with TestClient(app) as client:
+        assert client.post("/api/v1/search", json={"query": "first"}).status_code == 200
+        assert client.post("/api/v1/search", json={"query": "second"}).status_code == 200
+
+    assert factory_calls == 1
+    assert [call["query"] for call in workflow.calls] == ["first", "second"]
+
+
+def test_search_returns_non_ready_plan_without_results(settings: Settings) -> None:
+    workflow = StubWorkflow(
+        AppState(
+            query_plan=QueryPlan.model_validate_json(
+                plan_response(
+                    status="needs_clarification",
+                    ambiguities=["setor"],
+                    clarification_questions=["Qual setor?"],
+                )
+            ),
+            warnings=["query_plan_needs_clarification"],
+            errors=[],
+        )
+    )
+
+    with client_with_workflow(settings, workflow) as client:
+        response = client.post("/api/v1/search", json={"query": "startups"})
+
+    assert response.status_code == 200
+    assert response.json()["query_plan"]["status"] == "needs_clarification"
+    assert response.json()["candidate_startups"] == []
+
+
+def test_search_returns_invalid_plan_with_http_200(settings: Settings) -> None:
+    workflow = StubWorkflow(
+        AppState(
+            query_plan=QueryPlan.model_validate_json(plan_response(status="invalid")),
+            errors=[RecoverableError("query_invalid", "Consulta fora do escopo")],
+        )
+    )
+
+    with client_with_workflow(settings, workflow) as client:
+        response = client.post("/api/v1/search", json={"query": "previsão do tempo"})
+
+    assert response.status_code == 200
+    assert response.json()["query_plan"]["status"] == "invalid"
+    assert response.json()["errors"][0]["code"] == "query_invalid"
+
+
+def test_search_treats_empty_retrieval_as_success(settings: Settings) -> None:
+    workflow = StubWorkflow(
+        AppState(
+            query_plan=QueryPlan.model_validate_json(plan_response()),
+            candidate_startups=[],
+            selected_sources=[],
+            warnings=["retriever_no_results"],
+            errors=[],
+        )
+    )
+
+    with client_with_workflow(settings, workflow) as client:
+        response = client.post("/api/v1/search", json={"query": "sem resultados"})
+
+    assert response.status_code == 200
+    assert response.json()["candidate_startups"] == []
+    assert response.json()["selected_sources"] == []
+    assert response.json()["warnings"] == ["retriever_no_results"]
+
+
+@pytest.mark.parametrize(
+    ("code", "expected_status"),
+    [
+        ("query_empty", 422),
+        ("query_too_long", 422),
+        ("query_plan_invalid_output", 502),
+        ("query_planner_unavailable", 503),
+        ("retriever_unavailable", 503),
+    ],
+)
+def test_search_maps_recoverable_errors(
+    settings: Settings, code: str, expected_status: int
+) -> None:
+    workflow = StubWorkflow(
+        AppState(errors=[RecoverableError(code=code, message="Safe failure", node="node")])
+    )
+
+    with client_with_workflow(settings, workflow) as client:
+        response = client.post("/api/v1/search", json={"query": "startups"})
+
+    assert response.status_code == expected_status
+    assert response.json()["errors"] == [{"code": code, "message": "Safe failure", "node": "node"}]
+
+
 def test_error_envelope_is_sanitized(client: TestClient) -> None:
     response = client.get("/missing", headers={"X-Correlation-ID": "error-123"})
 
@@ -161,12 +317,13 @@ def test_cors_allows_post_from_configured_origin(client: TestClient) -> None:
     assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
 
 
-def test_openapi_exposes_only_current_functional_route(client: TestClient) -> None:
+def test_openapi_exposes_current_functional_routes(client: TestClient) -> None:
     response = client.get("/api/v1/openapi.json")
 
     assert response.status_code == 200
     paths = response.json()["paths"]
     assert "/api/v1/query-plans" in paths
+    assert "/api/v1/search" in paths
     assert "/health/live" not in paths
     assert "/health/ready" not in paths
 

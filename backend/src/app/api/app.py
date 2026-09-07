@@ -12,14 +12,22 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.api.errors import ErrorResponse
 from app.api.middleware import correlation_and_logging_middleware
 from app.api.routes.query_plans import router as query_plans_router
+from app.api.routes.search import router as search_router
 from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging
 from app.core.resources import ApplicationResources
+from app.graph.agents.query_planner import create_query_planner_agent
+from app.graph.agents.retriever import RetrieverAgent
+from app.graph.builder import compile_analysis_workflow
 from app.graph.model_policy import ModelProfile, ModelRegistry
 from app.infrastructure.persistence.database import (
     DatabaseReadinessProbe,
     create_engine,
     create_session_factory,
+)
+from app.infrastructure.persistence.repositories import (
+    SqlAlchemyStartupDocumentRepository,
+    SqlAlchemyStartupRepository,
 )
 from app.infrastructure.providers.groq import create_groq_chat_model
 from app.infrastructure.vector.qdrant import (
@@ -50,6 +58,16 @@ async def create_resources(settings: Settings) -> ApplicationResources:
     model_registry = create_model_registry(settings)
     engine = create_engine(settings.postgres)
     sessions = create_session_factory(engine)
+    query_planner = create_query_planner_agent(
+        registry=model_registry,
+        config=settings.query_planner,
+    )
+    retriever = RetrieverAgent(
+        startups=SqlAlchemyStartupRepository(sessions),
+        documents=SqlAlchemyStartupDocumentRepository(sessions),
+        config=settings.retriever,
+    )
+    workflow = compile_analysis_workflow(query_planner=query_planner, retriever=retriever)
     qdrant = create_qdrant_client(settings.qdrant)
     try:
         await ensure_collection(qdrant, settings.qdrant)
@@ -66,6 +84,8 @@ async def create_resources(settings: Settings) -> ApplicationResources:
         llm_fast=model_registry.llm_fast,
         llm_heavy=model_registry.llm_heavy,
         model_registry=model_registry,
+        query_planner=query_planner,
+        workflow=workflow,
     )
 
 
@@ -142,4 +162,5 @@ def create_app(
         )
 
     app.include_router(query_plans_router)
+    app.include_router(search_router)
     return app

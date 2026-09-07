@@ -4,7 +4,7 @@ Plataforma idealizada para apoiar a NVIDIA na identificação, qualificação e 
 
 Desenvolvido por Lucas Bianchezzi Oliveira ([@LucasBO7](https://github.com/LucasBO7)).
 
-> Estado atual: fundações independentes do frontend e do backend. O backend fornece contratos, persistência, saúde, observabilidade e o Query Planner Agent; ainda não expõe uma rota de análise nem executa o pipeline completo.
+> Estado atual: o backend executa o fluxo parcial Query Planner → Retriever pelo LangGraph e expõe a busca para integração com o frontend. Os demais agentes do pipeline continuam pendentes.
 
 ## 1. Contexto
 
@@ -324,6 +324,7 @@ habilitado quando `APP__ENVIRONMENT=local`.
 
 Recursos locais:
 
+- Busca orquestrada: `POST http://127.0.0.1:8000/api/v1/search`;
 - Query Planner: `POST http://127.0.0.1:8000/api/v1/query-plans`;
 - Swagger UI: `http://127.0.0.1:8000/api/v1/docs`;
 - contrato OpenAPI: `http://127.0.0.1:8000/api/v1/openapi.json`.
@@ -373,11 +374,11 @@ Os status possíveis são:
 Por padrão, consultas aceitam até 2.000 caracteres, cada lista até 20 itens, o
 plano até três perguntas de esclarecimento, justificativas até 500 caracteres e
 uma tentativa de reparo estrutural. Os testes usam modelos falsos e não chamam a
-Groq, banco de dados ou internet. A rota atual não executa o Retriever nem as
-transições do grafo completo.
+Groq, banco de dados ou internet. A rota isolada `/api/v1/query-plans` não
+executa o Retriever; use `/api/v1/search` para executar o fluxo parcial.
 
-Para testar no Postman, selecione o método `POST`, use a URL
-`http://127.0.0.1:8000/api/v1/query-plans`, configure o header
+Para testar o fluxo no Postman, selecione o método `POST`, use a URL
+`http://127.0.0.1:8000/api/v1/search`, configure o header
 `Content-Type: application/json` e envie:
 
 ```json
@@ -389,7 +390,7 @@ Para testar no Postman, selecione o método `POST`, use a URL
 O frontend pode usar o mesmo contrato:
 
 ```typescript
-const response = await fetch("http://127.0.0.1:8000/api/v1/query-plans", {
+const response = await fetch("http://127.0.0.1:8000/api/v1/search", {
   method: "POST",
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify({ query }),
@@ -413,8 +414,10 @@ lote e preservam UUID, URL, título e trecho em `selected_sources`.
 O limite padrão é 20 startups e o trecho padrão possui 300 caracteres,
 configuráveis por `RETRIEVER__MAX_RESULTS` e `RETRIEVER__EXCERPT_LENGTH`. Busca
 sem correspondência produz listas vazias e `retriever_no_results`. Esta feature
-não adiciona rota HTTP nem conecta o grafo completo; esse encadeamento pertence
-a uma evolução posterior da API.
+é executada após o Query Planner pelo LangGraph quando o plano está `ready`.
+Planos ambíguos, inválidos ou com erro encerram antes da consulta ao PostgreSQL.
+O estado final é devolvido por `/api/v1/search` com plano, candidatos, fontes,
+avisos, erros e métricas. Indisponibilidade do PostgreSQL usa HTTP 503.
 
 ### 7.6. Qualidade e testes do backend
 
@@ -687,4 +690,4 @@ As alternativas retiradas do escopo desta fundação estão registradas em [docu
 
 ## 9. Próxima etapa
 
-A lógica dos oito agentes, a ingestão de dados, o fluxo funcional completo e a integração com o frontend continuam exigindo especificações próprias. Cada nova etapa deve reutilizar as portas e os modelos da fundação sem acoplar domínio a FastAPI, SQLAlchemy, Qdrant ou SDKs externos.
+A lógica dos seis agentes restantes, a ingestão de dados e a integração visual com o frontend continuam exigindo especificações próprias. Cada nova etapa deve reutilizar as portas e os modelos da fundação sem acoplar domínio a FastAPI, SQLAlchemy, Qdrant ou SDKs externos.
