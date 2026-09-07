@@ -8,6 +8,8 @@ ERROR_STATUS_BY_CODE = {
     "query_plan_invalid_output": status.HTTP_502_BAD_GATEWAY,
     "query_planner_unavailable": status.HTTP_503_SERVICE_UNAVAILABLE,
     "retriever_unavailable": status.HTTP_503_SERVICE_UNAVAILABLE,
+    "extractor_invalid_output": status.HTTP_502_BAD_GATEWAY,
+    "extractor_unavailable": status.HTTP_503_SERVICE_UNAVAILABLE,
 }
 
 

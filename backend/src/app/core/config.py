@@ -86,6 +86,16 @@ class RetrieverConfig(BaseModel):
     excerpt_length: int = Field(default=300, ge=50, le=2_000)
 
 
+class ExtractorConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    max_sources_per_startup: int = Field(default=10, ge=1, le=50)
+    max_context_characters: int = Field(default=12_000, ge=100, le=100_000)
+    max_fact_length: int = Field(default=1_000, ge=50, le=4_000)
+    max_items_per_list: int = Field(default=20, ge=1, le=50)
+    max_repair_attempts: int = Field(default=1, ge=0, le=1)
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=BACKEND_ROOT / ".env",
@@ -105,6 +115,7 @@ class Settings(BaseSettings):
     llm_heavy: LLMProfileConfig = LLMProfileConfig(model="openai/gpt-oss-120b", temperature=0.1)
     query_planner: QueryPlannerConfig = QueryPlannerConfig()
     retriever: RetrieverConfig = RetrieverConfig()
+    extractor: ExtractorConfig = ExtractorConfig()
     embeddings: ModelProviderConfig = Field(
         default_factory=lambda: ModelProviderConfig(provider="unset", model="unset")
     )

@@ -353,6 +353,7 @@ Todas as chaves aceitas e valores locais não sensíveis estão em `backend/.env
 | `LLM_HEAVY__` | perfil pesado compartilhado pelos agentes |
 | `QUERY_PLANNER__` | limites de consulta, listas, perguntas, justificativa e reparo |
 | `RETRIEVER__` | limite de startups retornadas e tamanho do trecho de evidência |
+| `EXTRACTOR__` | limites de fontes, contexto, fatos, listas e reparo da extração |
 | `EMBEDDINGS__` | futuro modelo de embeddings |
 | `RERANKER__` | adaptador de reranking Cohere |
 
@@ -432,7 +433,28 @@ Planos ambíguos, inválidos ou com erro encerram antes da consulta ao PostgreSQ
 O estado final é devolvido por `/api/v1/search` com plano, candidatos, fontes,
 avisos, erros e métricas. Indisponibilidade do PostgreSQL usa HTTP 503.
 
-### 7.6. Qualidade e testes do backend
+### 7.6. Extractor Agent
+
+Quando o Retriever encontra candidatas com documentos utilizáveis, o LangGraph
+executa o Extractor para analisar o texto de cada `selected_sources[].excerpt` e
+produzir `structured_profiles`. Cada produto, modelo de
+negócio, setor, público-alvo, caso de uso de IA, tecnologia, infraestrutura,
+dependência, necessidade técnica ou afirmação é retornado como um fato com o
+`startup_id`, UUID do documento e URL que o sustenta. Campos sem evidência ficam
+`null` ou vazios e são enumerados em `unknown_fields`.
+
+O agente usa o perfil `llm_fast`, processa uma startup por chamada e valida as
+referências contra as fontes entregues pelo Retriever. Uma saída estruturalmente
+inválida recebe no máximo um reparo. O agente não classifica maturidade de IA,
+não valida definitivamente afirmações e não recomenda tecnologias. Os limites
+padrão são 10 fontes, 12.000 caracteres de contexto, fatos de 1.000 caracteres e
+20 itens por lista; todos podem ser ajustados pelo prefixo `EXTRACTOR__`.
+
+Busca sem fontes apropriadas encerra após o Retriever com HTTP 200 e o aviso
+`retriever_no_sources`. Saída inválida do Extractor usa HTTP 502 e
+indisponibilidade do modelo usa HTTP 503.
+
+### 7.7. Qualidade e testes do backend
 
 Execute cada verificação separadamente:
 

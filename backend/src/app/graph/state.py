@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, TypedDict
 from uuid import UUID
 
+from app.application.contracts.extraction import StructuredStartupProfile
 from app.application.contracts.query_plan import QueryPlan
 from app.domain.models import (
     AIMaturity,
@@ -18,14 +19,6 @@ class CandidateStartup(TypedDict):
     startup_id: UUID
     name: str
     score: float | None
-
-
-class StructuredProfile(TypedDict, total=False):
-    startup_id: UUID
-    summary: str
-    sector: str
-    technologies: list[str]
-    source_ids: list[UUID]
 
 
 class StartupClassification(TypedDict):
@@ -51,7 +44,7 @@ class AppState(TypedDict, total=False):
     filters: dict[str, Any]
     candidate_startups: list[CandidateStartup]
     selected_sources: list[SourceReference]
-    structured_profiles: list[StructuredProfile]
+    structured_profiles: list[StructuredStartupProfile]
     classifications: list[StartupClassification]
     validated_claims: list[Evidence]
     rejected_claims: list[Evidence]

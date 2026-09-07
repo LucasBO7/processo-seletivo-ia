@@ -10,6 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.api.app import create_app
+from app.application.contracts.extraction import StructuredStartupProfile
 from app.application.contracts.query_plan import QueryPlan
 from app.application.ports.providers import ChatModel, ChatModelError, ChatModelErrorCode
 from app.core.config import Settings
@@ -161,10 +162,29 @@ def test_search_returns_workflow_plan_candidates_and_sources(settings: Settings)
             candidate_startups=[{"startup_id": startup_id, "name": "Startup One", "score": 3.0}],
             selected_sources=[
                 SourceReference(
+                    startup_id=startup_id,
                     source_id=source_id,
                     source_url="https://example.com/source",
                     title="Official source",
                     excerpt="Public evidence",
+                )
+            ],
+            structured_profiles=[
+                StructuredStartupProfile(
+                    startup_id=startup_id,
+                    name="Startup One",
+                    unknown_fields=[
+                        "product",
+                        "business_model",
+                        "sector",
+                        "target_audience",
+                        "ai_use_cases",
+                        "technologies",
+                        "infrastructure",
+                        "external_dependencies",
+                        "technical_needs",
+                        "claims",
+                    ],
                 )
             ],
             warnings=[],
@@ -185,7 +205,10 @@ def test_search_returns_workflow_plan_candidates_and_sources(settings: Settings)
     assert body["query_plan"]["status"] == "ready"
     assert body["candidate_startups"][0]["startup_id"] == str(startup_id)
     assert body["selected_sources"][0]["source_id"] == str(source_id)
+    assert body["selected_sources"][0]["startup_id"] == str(startup_id)
     assert body["selected_sources"][0]["source_url"] == "https://example.com/source"
+    assert body["structured_profiles"][0]["startup_id"] == str(startup_id)
+    assert body["structured_profiles"][0]["name"] == "Startup One"
     assert workflow.calls[0]["correlation_id"] == "search-123"
     assert workflow.calls[0]["query"] == "startups"
 
@@ -320,6 +343,8 @@ def test_search_treats_empty_retrieval_as_success(settings: Settings) -> None:
         ("query_plan_invalid_output", 502),
         ("query_planner_unavailable", 503),
         ("retriever_unavailable", 503),
+        ("extractor_invalid_output", 502),
+        ("extractor_unavailable", 503),
     ],
 )
 def test_search_maps_recoverable_errors(
@@ -375,6 +400,10 @@ def test_openapi_exposes_current_functional_routes(client: TestClient) -> None:
     assert "seed" in schemas["StartupStage"]["enum"]
     assert "small" in schemas["CompanySize"]["enum"]
     assert "FilterSuggestion" in schemas
+    assert "StructuredStartupProfile" in schemas
+    assert "ExtractedFact" in schemas
+    assert "ExtractionSource" in schemas
+    assert "ProfileField" in schemas
 
 
 @pytest.mark.parametrize("path", ["/health/live", "/health/ready"])

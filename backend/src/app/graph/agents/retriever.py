@@ -119,6 +119,11 @@ class RetrieverAgent:
         warnings = list(state.get("warnings", []))
         if not ranked:
             warnings.append("retriever_no_results")
+        elif not any(
+            source.source_url.strip() and source.excerpt and source.excerpt.strip()
+            for source in sources
+        ):
+            warnings.append("retriever_no_sources")
         duration_ms = self._duration_ms(started_at)
         metrics = dict(state.get("metrics", {}))
         metrics.update(
@@ -160,6 +165,7 @@ class RetrieverAgent:
             )
         return [
             SourceReference(
+                startup_id=document.startup_id,
                 source_id=document.id,
                 source_url=document.source_url,
                 title=document.title,

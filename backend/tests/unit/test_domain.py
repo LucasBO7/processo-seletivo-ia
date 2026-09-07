@@ -22,6 +22,7 @@ def test_domain_defaults_use_uuid_and_utc() -> None:
 
 def test_evidence_accepts_traceable_source() -> None:
     source = SourceReference(
+        startup_id=uuid4(),
         source_id=uuid4(),
         source_url="https://example.com/evidence",
         title="Fonte",

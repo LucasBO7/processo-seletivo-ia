@@ -26,6 +26,7 @@ class AIMaturity(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class SourceReference:
+    startup_id: UUID
     source_id: UUID
     source_url: str
     title: str

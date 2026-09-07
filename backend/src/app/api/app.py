@@ -16,6 +16,7 @@ from app.api.routes.search import router as search_router
 from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging
 from app.core.resources import ApplicationResources
+from app.graph.agents.extractor import create_extractor_agent
 from app.graph.agents.query_planner import create_query_planner_agent
 from app.graph.agents.retriever import RetrieverAgent
 from app.graph.builder import compile_analysis_workflow
@@ -67,7 +68,10 @@ async def create_resources(settings: Settings) -> ApplicationResources:
         documents=SqlAlchemyStartupDocumentRepository(sessions),
         config=settings.retriever,
     )
-    workflow = compile_analysis_workflow(query_planner=query_planner, retriever=retriever)
+    extractor = create_extractor_agent(registry=model_registry, config=settings.extractor)
+    workflow = compile_analysis_workflow(
+        query_planner=query_planner, retriever=retriever, extractor=extractor
+    )
     qdrant = create_qdrant_client(settings.qdrant)
     try:
         await ensure_collection(qdrant, settings.qdrant)
@@ -85,6 +89,7 @@ async def create_resources(settings: Settings) -> ApplicationResources:
         llm_heavy=model_registry.llm_heavy,
         model_registry=model_registry,
         query_planner=query_planner,
+        extractor=extractor,
         workflow=workflow,
     )
 

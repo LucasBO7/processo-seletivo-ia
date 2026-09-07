@@ -55,6 +55,7 @@ async def test_application_resources_expose_the_shared_models(
     registry = ModelRegistry(llm_fast=fast, llm_heavy=heavy)
     workflow_calls = 0
     compiled_query_planner: object | None = None
+    compiled_extractor: object | None = None
 
     class StubWorkflow:
         async def ainvoke(self, state: AppState) -> AppState:
@@ -63,9 +64,10 @@ async def test_application_resources_expose_the_shared_models(
     workflow = StubWorkflow()
 
     def compile_workflow(**components: object) -> StubWorkflow:
-        nonlocal compiled_query_planner, workflow_calls
+        nonlocal compiled_extractor, compiled_query_planner, workflow_calls
         workflow_calls += 1
         compiled_query_planner = components["query_planner"]
+        compiled_extractor = components["extractor"]
         return workflow
 
     class StubEngine:
@@ -100,5 +102,6 @@ async def test_application_resources_expose_the_shared_models(
     assert resources.llm_heavy is heavy
     assert resources.model_registry is registry
     assert resources.query_planner is compiled_query_planner
+    assert resources.extractor is compiled_extractor
     assert resources.workflow is workflow
     assert workflow_calls == 1

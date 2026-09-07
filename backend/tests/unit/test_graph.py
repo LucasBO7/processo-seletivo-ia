@@ -12,9 +12,10 @@ from app.graph.builder import (
     compile_analysis_workflow,
     create_graph_builder,
     route_after_query_planner,
+    route_after_retriever,
 )
 from app.graph.nodes import ALL_NODE_NAMES, NodeName
-from app.graph.state import AppState, empty_state
+from app.graph.state import AppState, CandidateStartup, empty_state
 
 
 def test_all_eight_node_names_are_centralized() -> None:
@@ -25,6 +26,7 @@ def test_all_eight_node_names_are_centralized() -> None:
 
 def test_state_accepts_partial_updates_and_traceable_evidence() -> None:
     source = SourceReference(
+        startup_id=uuid4(),
         source_id=uuid4(),
         source_url="https://example.com",
         title="Fonte",
@@ -73,9 +75,10 @@ def test_builder_registers_current_nodes() -> None:
     builder = create_graph_builder(
         query_planner=RecordingNode(AppState()),
         retriever=RecordingNode(AppState()),
+        extractor=RecordingNode(AppState()),
     )
 
-    assert set(builder.nodes) == {"query_planner", "retriever"}
+    assert set(builder.nodes) == {"query_planner", "retriever", "extractor"}
 
 
 @pytest.mark.parametrize(
@@ -98,11 +101,39 @@ def test_route_after_query_planner(state: AppState, expected: str) -> None:
     assert route_after_query_planner(state) == expected
 
 
+def test_route_after_retriever_requires_attributable_source() -> None:
+    startup_id = uuid4()
+    usable = SourceReference(
+        startup_id=startup_id,
+        source_id=uuid4(),
+        source_url="https://example.com/source",
+        title="Source",
+        excerpt="Evidence",
+    )
+    candidate = CandidateStartup(startup_id=startup_id, name="Acme", score=1.0)
+
+    assert (
+        route_after_retriever(AppState(candidate_startups=[candidate], selected_sources=[usable]))
+        == "extract"
+    )
+    assert (
+        route_after_retriever(AppState(candidate_startups=[candidate], selected_sources=[]))
+        == "stop"
+    )
+    assert (
+        route_after_retriever(AppState(candidate_startups=[], selected_sources=[usable])) == "stop"
+    )
+
+
 @pytest.mark.asyncio
 async def test_workflow_runs_retriever_and_preserves_traceable_state() -> None:
     startup_id = uuid4()
     source = SourceReference(
-        source_id=uuid4(), source_url="https://example.com/evidence", title="Evidence"
+        startup_id=startup_id,
+        source_id=uuid4(),
+        source_url="https://example.com/evidence",
+        title="Evidence",
+        excerpt="Traceable evidence",
     )
     planner = RecordingNode(
         AppState(
@@ -119,13 +150,17 @@ async def test_workflow_runs_retriever_and_preserves_traceable_state() -> None:
             metrics={"query_planner_duration_ms": 1.0, "retriever_duration_ms": 2.0},
         )
     )
-    workflow = compile_analysis_workflow(query_planner=planner, retriever=retriever)
+    extractor = RecordingNode(AppState())
+    workflow = compile_analysis_workflow(
+        query_planner=planner, retriever=retriever, extractor=extractor
+    )
 
     result = await workflow.ainvoke(
         empty_state(run_id=uuid4(), correlation_id="corr-workflow", query="startups")
     )
 
     assert len(retriever.calls) == 1
+    assert len(extractor.calls) == 1
     assert retriever.calls[0]["query_plan"] == query_plan()
     assert result["candidate_startups"][0]["startup_id"] == startup_id
     assert result["selected_sources"][0].source_id == source.source_id
@@ -139,7 +174,10 @@ async def test_workflow_runs_retriever_and_preserves_traceable_state() -> None:
 async def test_workflow_stops_before_retriever_for_non_ready_plan(status: str) -> None:
     planner = RecordingNode(AppState(query_plan=query_plan(status)))
     retriever = RecordingNode(AppState())
-    workflow = compile_analysis_workflow(query_planner=planner, retriever=retriever)
+    extractor = RecordingNode(AppState())
+    workflow = compile_analysis_workflow(
+        query_planner=planner, retriever=retriever, extractor=extractor
+    )
 
     result = await workflow.ainvoke(
         empty_state(run_id=uuid4(), correlation_id="corr-stop", query="consulta")
@@ -147,6 +185,7 @@ async def test_workflow_stops_before_retriever_for_non_ready_plan(status: str) -
 
     assert result["query_plan"].status.value == status
     assert retriever.calls == []
+    assert extractor.calls == []
 
 
 @pytest.mark.asyncio
@@ -156,7 +195,10 @@ async def test_workflow_stops_before_retriever_when_planner_fails() -> None:
     )
     planner = RecordingNode(AppState(errors=[planner_error]))
     retriever = RecordingNode(AppState())
-    workflow = compile_analysis_workflow(query_planner=planner, retriever=retriever)
+    extractor = RecordingNode(AppState())
+    workflow = compile_analysis_workflow(
+        query_planner=planner, retriever=retriever, extractor=extractor
+    )
 
     result = await workflow.ainvoke(
         empty_state(run_id=uuid4(), correlation_id="corr-error", query="consulta")
@@ -170,7 +212,10 @@ async def test_workflow_stops_before_retriever_when_planner_fails() -> None:
 async def test_workflow_invocations_do_not_share_mutable_state() -> None:
     planner = RecordingNode(AppState(query_plan=query_plan()))
     retriever = RecordingNode(AppState())
-    workflow = compile_analysis_workflow(query_planner=planner, retriever=retriever)
+    extractor = RecordingNode(AppState())
+    workflow = compile_analysis_workflow(
+        query_planner=planner, retriever=retriever, extractor=extractor
+    )
 
     first = await workflow.ainvoke(
         empty_state(run_id=uuid4(), correlation_id="first", query="first")

@@ -214,6 +214,7 @@ async def test_keeps_startup_without_documents() -> None:
 
     assert update["candidate_startups"][0]["startup_id"] == startup.id
     assert update["selected_sources"] == []
+    assert update["warnings"] == ["retriever_no_sources"]
 
 
 @pytest.mark.asyncio

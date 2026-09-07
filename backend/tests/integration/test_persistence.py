@@ -11,6 +11,7 @@ from sqlalchemy import inspect
 from app.application.contracts.retrieval import StartupSearchCriteria
 from app.core.config import Settings
 from app.domain.models import KnowledgeChunk, KnowledgeDocument, Startup, StartupDocument
+from app.graph.agents.extractor import ExtractorAgent
 from app.graph.agents.query_planner import create_query_planner_agent
 from app.graph.agents.retriever import RetrieverAgent
 from app.graph.builder import compile_analysis_workflow
@@ -24,7 +25,7 @@ from app.infrastructure.persistence.repositories import (
     SqlAlchemyStartupRepository,
 )
 from app.infrastructure.vector.qdrant import create_qdrant_client, ensure_collection
-from tests.fakes.providers import FakeChatModel
+from tests.fakes.providers import FakeChatModel, SequenceChatModel
 
 pytestmark = pytest.mark.integration
 
@@ -136,6 +137,50 @@ async def test_schema_repositories_and_qdrant_are_consistent() -> None:
                 documents=startup_document_repository,
                 config=settings.retriever,
             ),
+            extractor=ExtractorAgent(
+                model=SequenceChatModel(
+                    [
+                        json.dumps(
+                            {
+                                "product": None,
+                                "business_model": None,
+                                "sector": None,
+                                "target_audience": None,
+                                "ai_use_cases": [],
+                                "technologies": [],
+                                "infrastructure": [],
+                                "external_dependencies": [],
+                                "technical_needs": [],
+                                "claims": [
+                                    {
+                                        "value": document.content_text,
+                                        "sources": [
+                                            {
+                                                "startup_id": str(document.startup_id),
+                                                "source_id": str(document.id),
+                                                "source_url": document.source_url,
+                                            }
+                                        ],
+                                    }
+                                ],
+                                "unknown_fields": [
+                                    "product",
+                                    "business_model",
+                                    "sector",
+                                    "target_audience",
+                                    "ai_use_cases",
+                                    "technologies",
+                                    "infrastructure",
+                                    "external_dependencies",
+                                    "technical_needs",
+                                ],
+                            }
+                        )
+                        for document in (financial_management_evidence, evidence)
+                    ]
+                ),
+                config=settings.extractor,
+            ),
         )
         workflow_result = await workflow.ainvoke(
             empty_state(
@@ -156,6 +201,15 @@ async def test_schema_repositories_and_qdrant_are_consistent() -> None:
             evidence.source_url,
             financial_management_evidence.source_url,
         }
+        assert {profile.startup_id for profile in workflow_result["structured_profiles"]} == {
+            startup.id,
+            financial_management.id,
+        }
+        assert {
+            claim.sources[0].source_id
+            for profile in workflow_result["structured_profiles"]
+            for claim in profile.claims
+        } == {evidence.id, financial_management_evidence.id}
 
         async with engine.connect() as connection:
             startup_indexes = await connection.run_sync(

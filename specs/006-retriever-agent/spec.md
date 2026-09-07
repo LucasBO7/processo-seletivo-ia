@@ -137,3 +137,9 @@ aprovada e a entrega receber aprovação explícita.
 ## Sugestão de commit
 
 `feat(retriever): query PostgreSQL from structured query plans`
+
+## Evolução posterior
+
+A especificação 009 adiciona `startup_id` a cada `SourceReference`, usa essa
+associação para encaminhar fontes ao Extractor e define o aviso
+`retriever_no_sources` quando há candidatas, mas nenhuma fonte apropriada.

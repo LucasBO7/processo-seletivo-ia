@@ -201,3 +201,9 @@ aprovação explícita.
 ## Sugestão de commit
 
 `feat(graph): orchestrate query planner and retriever workflow`
+
+## Evolução posterior
+
+A especificação 009 estende este fluxo com a decisão
+`Retriever → Extractor/END` e encerra em `END` após a extração. O endpoint de
+planejamento isolado permanece inalterado.

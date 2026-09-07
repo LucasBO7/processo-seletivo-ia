@@ -76,6 +76,7 @@ class StubResources:
             model=self.chat_model,
             config=QueryPlannerConfig(),
         )
+        self.extractor = None
         self.workflow = workflow or StubWorkflow()
         self.closed = False
 

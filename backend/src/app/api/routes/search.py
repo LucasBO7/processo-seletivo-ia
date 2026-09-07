@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict
 
 from app.api.routes.query_plans import RecoverableErrorResponse
 from app.api.status import response_status
+from app.application.contracts.extraction import StructuredStartupProfile
 from app.application.contracts.query_plan import QueryPlan
 from app.core.resources import ApplicationResources
 from app.graph.state import empty_state
@@ -29,6 +30,7 @@ class CandidateStartupResponse(BaseModel):
 
 
 class SourceReferenceResponse(BaseModel):
+    startup_id: UUID
     source_id: UUID
     source_url: str
     title: str
@@ -39,6 +41,7 @@ class SearchResponse(BaseModel):
     query_plan: QueryPlan | None = None
     candidate_startups: list[CandidateStartupResponse]
     selected_sources: list[SourceReferenceResponse]
+    structured_profiles: list[StructuredStartupProfile]
     warnings: list[str]
     errors: list[RecoverableErrorResponse]
     metrics: dict[str, float]
@@ -68,6 +71,7 @@ async def search(payload: SearchRequest, request: Request) -> JSONResponse:
         ],
         selected_sources=[
             SourceReferenceResponse(
+                startup_id=source.startup_id,
                 source_id=source.source_id,
                 source_url=source.source_url,
                 title=source.title,
@@ -75,6 +79,7 @@ async def search(payload: SearchRequest, request: Request) -> JSONResponse:
             )
             for source in final_state.get("selected_sources", [])
         ],
+        structured_profiles=final_state.get("structured_profiles", []),
         warnings=final_state.get("warnings", []),
         errors=[RecoverableErrorResponse.from_domain(error) for error in errors],
         metrics=final_state.get("metrics", {}),

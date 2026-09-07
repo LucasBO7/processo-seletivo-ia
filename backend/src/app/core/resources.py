@@ -22,6 +22,7 @@ class ApplicationResources:
     llm_heavy: ChatModel
     model_registry: ModelRegistry
     query_planner: GraphNode
+    extractor: GraphNode
     workflow: AnalysisWorkflow
 
     async def close(self) -> None:
