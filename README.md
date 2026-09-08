@@ -849,3 +849,23 @@ Inception exigem um chunk oficial específico. Dados sem fonte resolvível são 
 com aviso, e falhas de modelo não expõem a mensagem original do provedor. Os limites
 operacionais estão no grupo `BRIEFING__*` de `backend/.env.example`. Esta etapa não
 implementa exportação visual nem persistência dos briefings.
+
+## 12. Orquestração completa do pipeline
+
+O único `StateGraph` criado na especificação 007 executa a sequência completa:
+Query Planner → Retriever → Extractor → Startup Classifier → Evidence Validator
+→ NVIDIA RAG → Recommendation → Briefing. Cada transição verifica a presença de
+contratos válidos e associações coerentes por startup antes de executar o próximo
+nó.
+
+Consultas inválidas ou ambíguas, buscas vazias, ausência de documentos, extração
+sem perfil, evidência sem fato utilizável, contexto NVIDIA insuficiente e ausência
+de recomendação encerram o fluxo no ponto correspondente. Resultados parciais
+válidos podem continuar mesmo quando outra startup produzir erro recuperável. O
+workflow, modelos, repositories, pool e clientes são compostos uma vez no lifespan;
+`POST /api/v1/search` apenas cria um estado independente e chama `ainvoke`.
+
+O pipeline não usa memória conversacional, checkpointer, autenticação, scraping,
+intervenção humana ou um segundo grafo. A topologia, os roteamentos e o fluxo com
+os oito agentes reais são cobertos por testes com provedores falsos e
+infraestrutura controlada.

@@ -27,6 +27,7 @@ from app.application.contracts.query_plan import QueryPlan
 from app.application.contracts.recommendation import StartupRecommendation
 from app.domain.models import RecoverableError, SourceReference
 from app.graph.builder import (
+    PIPELINE_NODE_ORDER,
     compile_analysis_workflow,
     create_graph_builder,
     route_after_classifier,
@@ -118,6 +119,36 @@ def test_builder_registers_current_nodes() -> None:
     }
 
 
+def test_builder_exposes_exact_full_pipeline_topology() -> None:
+    node = RecordingNode(AppState())
+    builder = create_graph_builder(
+        query_planner=node,
+        retriever=node,
+        extractor=node,
+        startup_classifier=node,
+        evidence_validator=node,
+        nvidia_rag=node,
+        recommendation=node,
+        briefing=node,
+    )
+    expected_targets = {
+        "query_planner": {"retrieve": "retriever", "stop": "__end__"},
+        "retriever": {"extract": "extractor", "stop": "__end__"},
+        "extractor": {"classify": "startup_classifier", "stop": "__end__"},
+        "startup_classifier": {"validate": "evidence_validator", "stop": "__end__"},
+        "evidence_validator": {"retrieve_nvidia": "nvidia_rag", "stop": "__end__"},
+        "nvidia_rag": {"recommend": "recommendation", "stop": "__end__"},
+        "recommendation": {"brief": "briefing", "stop": "__end__"},
+    }
+
+    assert PIPELINE_NODE_ORDER == ALL_NODE_NAMES
+    assert builder.edges == {("__start__", "query_planner"), ("briefing", "__end__")}
+    assert set(builder.branches) == set(expected_targets)
+    for source, targets in expected_targets.items():
+        branch = next(iter(builder.branches[source].values()))
+        assert branch.ends == targets
+
+
 def test_route_after_nvidia_rag_requires_matching_sufficient_citable_context() -> None:
     profile, source_ids = _usable_profile_for_recommendation()
     context = _sufficient_context_for_recommendation(profile.startup_id)
@@ -126,6 +157,19 @@ def test_route_after_nvidia_rag_requires_matching_sufficient_citable_context() -
         == "recommend"
     )
     assert route_after_nvidia_rag(AppState(validated_profiles=[profile])) == "stop"
+    insufficient = context.model_copy(
+        update={
+            "sufficiency": context.sufficiency.model_copy(
+                update={"status": NvidiaContextStatus.INSUFFICIENT}
+            )
+        }
+    )
+    assert (
+        route_after_nvidia_rag(
+            AppState(validated_profiles=[profile], nvidia_contexts=[insufficient])
+        )
+        == "stop"
+    )
     assert source_ids
 
 
@@ -215,6 +259,19 @@ def test_route_after_query_planner(state: AppState, expected: str) -> None:
     assert route_after_query_planner(state) == expected
 
 
+def test_routes_reject_malformed_truthy_values_without_raising() -> None:
+    assert route_after_query_planner(AppState(query_plan={"status": "ready"})) == "stop"
+    assert (
+        route_after_retriever(
+            AppState(
+                candidate_startups=[{"startup_id": "not-a-uuid", "name": "Acme"}],
+                selected_sources=[],
+            )
+        )
+        == "stop"
+    )
+
+
 def test_route_after_retriever_requires_attributable_source() -> None:
     startup_id = uuid4()
     usable = SourceReference(
@@ -237,6 +294,23 @@ def test_route_after_retriever_requires_attributable_source() -> None:
     assert (
         route_after_retriever(AppState(candidate_startups=[], selected_sources=[usable])) == "stop"
     )
+    assert (
+        route_after_retriever(
+            AppState(
+                candidate_startups=[candidate],
+                selected_sources=[
+                    SourceReference(
+                        startup_id=startup_id,
+                        source_id=uuid4(),
+                        source_url="https://example.com/source",
+                        title="Source",
+                        excerpt="   ",
+                    )
+                ],
+            )
+        )
+        == "stop"
+    )
 
 
 def test_route_after_extractor_requires_profile() -> None:
@@ -249,6 +323,7 @@ def test_route_after_extractor_requires_profile() -> None:
     assert route_after_extractor(AppState(structured_profiles=[profile])) == "classify"
     assert route_after_extractor(AppState(structured_profiles=[])) == "stop"
     assert route_after_extractor(AppState()) == "stop"
+    assert route_after_extractor(AppState(structured_profiles=[{"invalid": True}])) == "stop"
 
 
 def test_route_after_classifier_requires_profile_not_classification() -> None:
@@ -258,6 +333,15 @@ def test_route_after_classifier_requires_profile_not_classification() -> None:
 
     assert route_after_classifier(AppState(structured_profiles=[profile])) == "validate"
     assert route_after_classifier(AppState(structured_profiles=[])) == "stop"
+    assert (
+        route_after_classifier(
+            AppState(
+                structured_profiles=[profile],
+                errors=[RecoverableError("classifier_unavailable", "safe")],
+            )
+        )
+        == "validate"
+    )
 
 
 def test_route_after_validator_requires_usable_validated_profile() -> None:
@@ -282,6 +366,123 @@ def test_route_after_validator_requires_usable_validated_profile() -> None:
     )
     assert route_after_evidence_validator(AppState(validated_profiles=[empty])) == "stop"
     assert route_after_evidence_validator(AppState()) == "stop"
+
+
+def test_recoverable_errors_keep_valid_partial_outputs_routable() -> None:
+    profile, source_ids = _usable_profile_for_recommendation()
+    context = _sufficient_context_for_recommendation(profile.startup_id)
+    source = SourceReference(
+        startup_id=profile.startup_id,
+        source_id=source_ids[0],
+        source_url="https://example.com/evidence",
+        title="Evidence",
+        excerpt="Inference API",
+    )
+    candidate = CandidateStartup(startup_id=profile.startup_id, name=profile.name, score=1.0)
+    error = RecoverableError("stage_unavailable", "Safe failure")
+    recommendation = StartupRecommendation.model_construct(startup_id=profile.startup_id)
+
+    assert (
+        route_after_retriever(
+            AppState(
+                candidate_startups=[candidate],
+                selected_sources=[source],
+                errors=[error],
+            )
+        )
+        == "extract"
+    )
+    assert (
+        route_after_extractor(AppState(structured_profiles=[profile], errors=[error])) == "classify"
+    )
+    assert (
+        route_after_evidence_validator(AppState(validated_profiles=[profile], errors=[error]))
+        == "retrieve_nvidia"
+    )
+    assert (
+        route_after_nvidia_rag(
+            AppState(
+                validated_profiles=[profile],
+                nvidia_contexts=[context],
+                errors=[error],
+            )
+        )
+        == "recommend"
+    )
+    assert (
+        route_after_recommendation(AppState(recommendations=[recommendation], errors=[error]))
+        == "brief"
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("stop_after", "expected_calls"),
+    [
+        ("retriever", 2),
+        ("extractor", 3),
+        ("evidence_validator", 5),
+        ("nvidia_rag", 6),
+        ("recommendation", 7),
+    ],
+)
+async def test_workflow_interrupts_before_node_without_preconditions(
+    stop_after: str, expected_calls: int
+) -> None:
+    profile, source_ids = _usable_profile_for_recommendation()
+    context = _sufficient_context_for_recommendation(profile.startup_id)
+    source = SourceReference(
+        startup_id=profile.startup_id,
+        source_id=source_ids[0],
+        source_url="https://example.com/evidence",
+        title="Evidence",
+        excerpt="Inference API",
+    )
+    recommendation = StartupRecommendation.model_construct(startup_id=profile.startup_id)
+    nodes = {
+        "query_planner": RecordingNode(AppState(query_plan=query_plan())),
+        "retriever": RecordingNode(
+            AppState(
+                candidate_startups=[
+                    {"startup_id": profile.startup_id, "name": profile.name, "score": 1.0}
+                ],
+                selected_sources=[source],
+            )
+        ),
+        "extractor": RecordingNode(AppState(structured_profiles=[profile])),
+        "startup_classifier": RecordingNode(AppState(classifications=[])),
+        "evidence_validator": RecordingNode(AppState(validated_profiles=[profile])),
+        "nvidia_rag": RecordingNode(AppState(nvidia_contexts=[context])),
+        "recommendation": RecordingNode(AppState(recommendations=[recommendation])),
+        "briefing": RecordingNode(AppState()),
+    }
+    stop_updates = {
+        "retriever": AppState(candidate_startups=[], selected_sources=[]),
+        "extractor": AppState(structured_profiles=[]),
+        "evidence_validator": AppState(validated_profiles=[]),
+        "nvidia_rag": AppState(nvidia_contexts=[]),
+        "recommendation": AppState(recommendations=[]),
+    }
+    nodes[stop_after].update = stop_updates[stop_after]
+    workflow = compile_analysis_workflow(
+        query_planner=nodes["query_planner"],
+        retriever=nodes["retriever"],
+        extractor=nodes["extractor"],
+        startup_classifier=nodes["startup_classifier"],
+        evidence_validator=nodes["evidence_validator"],
+        nvidia_rag=nodes["nvidia_rag"],
+        recommendation=nodes["recommendation"],
+        briefing=nodes["briefing"],
+    )
+
+    await workflow.ainvoke(
+        empty_state(run_id=uuid4(), correlation_id=f"stop-{stop_after}", query="startups")
+    )
+
+    assert sum(len(node.calls) for node in nodes.values()) == expected_calls
+    ordered = [nodes[item.value] for item in PIPELINE_NODE_ORDER]
+    assert all(len(node.calls) == 1 for node in ordered[:expected_calls])
+    assert all(node.calls == [] for node in ordered[expected_calls:])
 
 
 @pytest.mark.asyncio

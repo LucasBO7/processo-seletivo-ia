@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 from typing import Literal, cast
+from uuid import UUID
 
 from langgraph.graph import END, START, StateGraph
 
-from app.application.contracts.nvidia_rag import NvidiaContextStatus
-from app.application.contracts.query_plan import QueryPlanStatus
+from app.application.contracts.evidence_validation import ValidatedStartupProfile
+from app.application.contracts.extraction import StructuredStartupProfile
+from app.application.contracts.nvidia_rag import NvidiaContextStatus, NvidiaStartupContext
+from app.application.contracts.query_plan import QueryPlan, QueryPlanStatus
 from app.application.contracts.recommendation import StartupRecommendation
+from app.domain.models import SourceReference
 from app.graph.contracts import AnalysisWorkflow, GraphNode
 from app.graph.nodes import NodeName
 from app.graph.state import AppState
@@ -25,6 +29,26 @@ BLOCKING_PLANNER_ERRORS = {
     "query_plan_invalid_output",
     "query_planner_unavailable",
 }
+PIPELINE_NODE_ORDER: tuple[NodeName, ...] = (
+    NodeName.QUERY_PLANNER,
+    NodeName.RETRIEVER,
+    NodeName.EXTRACTOR,
+    NodeName.STARTUP_CLASSIFIER,
+    NodeName.EVIDENCE_VALIDATOR,
+    NodeName.NVIDIA_RAG,
+    NodeName.RECOMMENDATION,
+    NodeName.BRIEFING,
+)
+
+
+def _candidate_startup_id(value: object) -> UUID | None:
+    if not isinstance(value, dict):
+        return None
+    startup_id = value.get("startup_id")
+    name = value.get("name")
+    if not isinstance(startup_id, UUID) or not isinstance(name, str) or not name.strip():
+        return None
+    return startup_id
 
 
 def route_after_query_planner(state: AppState) -> RouteAfterPlanner:
@@ -33,16 +57,25 @@ def route_after_query_planner(state: AppState) -> RouteAfterPlanner:
     has_blocking_error = any(
         error.code in BLOCKING_PLANNER_ERRORS for error in state.get("errors", [])
     )
-    if plan is not None and plan.status is QueryPlanStatus.READY and not has_blocking_error:
+    if (
+        isinstance(plan, QueryPlan)
+        and plan.status is QueryPlanStatus.READY
+        and not has_blocking_error
+    ):
         return "retrieve"
     return "stop"
 
 
 def route_after_retriever(state: AppState) -> RouteAfterRetriever:
     """Extract only when a candidate has an attributable, usable source."""
-    candidate_ids = {candidate["startup_id"] for candidate in state.get("candidate_startups", [])}
+    candidate_ids = {
+        startup_id
+        for candidate in state.get("candidate_startups", [])
+        if (startup_id := _candidate_startup_id(candidate)) is not None
+    }
     has_appropriate_source = any(
-        source.startup_id in candidate_ids
+        isinstance(source, SourceReference)
+        and source.startup_id in candidate_ids
         and source.source_url.strip()
         and source.excerpt is not None
         and source.excerpt.strip()
@@ -53,12 +86,26 @@ def route_after_retriever(state: AppState) -> RouteAfterRetriever:
 
 def route_after_extractor(state: AppState) -> RouteAfterExtractor:
     """Classify only when the Extractor produced a validated profile."""
-    return "classify" if state.get("structured_profiles") else "stop"
+    return (
+        "classify"
+        if any(
+            isinstance(profile, StructuredStartupProfile)
+            for profile in state.get("structured_profiles", [])
+        )
+        else "stop"
+    )
 
 
 def route_after_classifier(state: AppState) -> RouteAfterClassifier:
     """Validate evidence whenever at least one structured profile exists."""
-    return "validate" if state.get("structured_profiles") else "stop"
+    return (
+        "validate"
+        if any(
+            isinstance(profile, StructuredStartupProfile)
+            for profile in state.get("structured_profiles", [])
+        )
+        else "stop"
+    )
 
 
 def route_after_evidence_validator(state: AppState) -> RouteAfterEvidenceValidator:
@@ -67,7 +114,10 @@ def route_after_evidence_validator(state: AppState) -> RouteAfterEvidenceValidat
 
     return (
         "retrieve_nvidia"
-        if any(is_usable_profile(profile) for profile in state.get("validated_profiles", []))
+        if any(
+            isinstance(profile, ValidatedStartupProfile) and is_usable_profile(profile)
+            for profile in state.get("validated_profiles", [])
+        )
         else "stop"
     )
 
@@ -82,7 +132,8 @@ def route_after_nvidia_rag(state: AppState) -> RouteAfterNvidiaRag:
         if is_usable_profile(profile)
     }
     eligible = any(
-        context.startup_id in usable_ids
+        isinstance(context, NvidiaStartupContext)
+        and context.startup_id in usable_ids
         and context.sufficiency.status is NvidiaContextStatus.SUFFICIENT
         and any(chunk.startup_id == context.startup_id for chunk in context.chunks)
         for context in state.get("nvidia_contexts", [])
