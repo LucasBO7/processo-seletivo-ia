@@ -21,7 +21,7 @@ MODEL_PROFILE_BY_NODE: Mapping[NodeName, ModelProfile | None] = MappingProxyType
         NodeName.EXTRACTOR: ModelProfile.FAST,
         NodeName.STARTUP_CLASSIFIER: ModelProfile.HEAVY,
         NodeName.EVIDENCE_VALIDATOR: ModelProfile.FAST,
-        NodeName.NVIDIA_RAG: ModelProfile.FAST,
+        NodeName.NVIDIA_RAG: None,
         NodeName.RECOMMENDATION: ModelProfile.HEAVY,
         NodeName.BRIEFING: ModelProfile.HEAVY,
     }

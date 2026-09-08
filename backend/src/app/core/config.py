@@ -151,6 +151,51 @@ class KnowledgeIngestionConfig(BaseModel):
         return self
 
 
+class NvidiaRagConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    vector_top_k: int = Field(default=20, ge=1, le=100)
+    lexical_top_k: int = Field(default=20, ge=1, le=100)
+    fused_top_k: int = Field(default=30, ge=1, le=100)
+    rerank_top_n: int = Field(default=10, ge=1, le=100)
+    rrf_k: int = Field(default=60, ge=1, le=1_000)
+    vector_weight: float = Field(default=0.5, ge=0, le=1)
+    lexical_weight: float = Field(default=0.5, ge=0, le=1)
+    min_relevant_chunks: int = Field(default=2, ge=1, le=20)
+    min_distinct_documents: int = Field(default=1, ge=1, le=20)
+    min_reranker_score: float = Field(default=0.2, ge=0, le=1)
+    min_hybrid_score: float = Field(default=0.35, ge=0, le=1)
+    max_attempts: int = Field(default=3, ge=1, le=3)
+    expansion_multiplier: float = Field(default=2.0, ge=1, le=4)
+    max_query_items: int = Field(default=20, ge=1, le=50)
+    max_query_chars: int = Field(default=2_000, ge=100, le=2_000)
+
+    @model_validator(mode="after")
+    def validate_ranking_limits(self) -> Self:
+        if abs((self.vector_weight + self.lexical_weight) - 1.0) > 1e-9:
+            raise ValueError("NVIDIA RAG weights must sum to 1")
+        if self.rerank_top_n > self.fused_top_k:
+            raise ValueError("rerank_top_n must not exceed fused_top_k")
+        if self.min_relevant_chunks > self.rerank_top_n:
+            raise ValueError("min_relevant_chunks must not exceed rerank_top_n")
+        if self.min_distinct_documents > self.min_relevant_chunks:
+            raise ValueError("min_distinct_documents must not exceed min_relevant_chunks")
+        return self
+
+
+class RecommendationConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    max_recommendations_per_startup: int = Field(default=10, ge=1, le=50)
+    max_needs_per_startup: int = Field(default=20, ge=1, le=50)
+    max_startup_evidence: int = Field(default=30, ge=2, le=100)
+    max_nvidia_chunks: int = Field(default=20, ge=1, le=100)
+    max_context_characters: int = Field(default=20_000, ge=1_000, le=200_000)
+    max_justification_length: int = Field(default=1_000, ge=50, le=4_000)
+    max_next_action_length: int = Field(default=500, ge=20, le=2_000)
+    max_repair_attempts: int = Field(default=1, ge=0, le=1)
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=BACKEND_ROOT / ".env",
@@ -174,6 +219,8 @@ class Settings(BaseSettings):
     startup_classifier: StartupClassifierConfig = StartupClassifierConfig()
     evidence_validator: EvidenceValidatorConfig = EvidenceValidatorConfig()
     knowledge_ingestion: KnowledgeIngestionConfig = KnowledgeIngestionConfig()
+    nvidia_rag: NvidiaRagConfig = NvidiaRagConfig()
+    recommendation: RecommendationConfig = RecommendationConfig()
     embeddings: ModelProviderConfig = Field(
         default_factory=lambda: ModelProviderConfig(provider="unset", model="unset")
     )

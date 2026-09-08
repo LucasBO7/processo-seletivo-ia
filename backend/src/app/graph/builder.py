@@ -4,6 +4,7 @@ from typing import Literal, cast
 
 from langgraph.graph import END, START, StateGraph
 
+from app.application.contracts.nvidia_rag import NvidiaContextStatus
 from app.application.contracts.query_plan import QueryPlanStatus
 from app.graph.contracts import AnalysisWorkflow, GraphNode
 from app.graph.nodes import NodeName
@@ -13,6 +14,8 @@ RouteAfterPlanner = Literal["retrieve", "stop"]
 RouteAfterRetriever = Literal["extract", "stop"]
 RouteAfterExtractor = Literal["classify", "stop"]
 RouteAfterClassifier = Literal["validate", "stop"]
+RouteAfterEvidenceValidator = Literal["retrieve_nvidia", "stop"]
+RouteAfterNvidiaRag = Literal["recommend", "stop"]
 BLOCKING_PLANNER_ERRORS = {
     "query_empty",
     "query_too_long",
@@ -56,6 +59,35 @@ def route_after_classifier(state: AppState) -> RouteAfterClassifier:
     return "validate" if state.get("structured_profiles") else "stop"
 
 
+def route_after_evidence_validator(state: AppState) -> RouteAfterEvidenceValidator:
+    """Retrieve NVIDIA context only for profiles containing validated facts."""
+    from app.graph.agents.nvidia_rag import is_usable_profile
+
+    return (
+        "retrieve_nvidia"
+        if any(is_usable_profile(profile) for profile in state.get("validated_profiles", []))
+        else "stop"
+    )
+
+
+def route_after_nvidia_rag(state: AppState) -> RouteAfterNvidiaRag:
+    """Recommend only for matching usable profiles and sufficient citable contexts."""
+    from app.graph.agents.nvidia_rag import is_usable_profile
+
+    usable_ids = {
+        profile.startup_id
+        for profile in state.get("validated_profiles", [])
+        if is_usable_profile(profile)
+    }
+    eligible = any(
+        context.startup_id in usable_ids
+        and context.sufficiency.status is NvidiaContextStatus.SUFFICIENT
+        and any(chunk.startup_id == context.startup_id for chunk in context.chunks)
+        for context in state.get("nvidia_contexts", [])
+    )
+    return "recommend" if eligible else "stop"
+
+
 def create_graph_builder(
     *,
     query_planner: GraphNode,
@@ -63,6 +95,8 @@ def create_graph_builder(
     extractor: GraphNode,
     startup_classifier: GraphNode,
     evidence_validator: GraphNode,
+    nvidia_rag: GraphNode,
+    recommendation: GraphNode,
 ) -> StateGraph[AppState, None, AppState, AppState]:
     builder = StateGraph(AppState)
     builder.add_node(NodeName.QUERY_PLANNER.value, query_planner)
@@ -70,6 +104,8 @@ def create_graph_builder(
     builder.add_node(NodeName.EXTRACTOR.value, extractor)
     builder.add_node(NodeName.STARTUP_CLASSIFIER.value, startup_classifier)
     builder.add_node(NodeName.EVIDENCE_VALIDATOR.value, evidence_validator)
+    builder.add_node(NodeName.NVIDIA_RAG.value, nvidia_rag)
+    builder.add_node(NodeName.RECOMMENDATION.value, recommendation)
     builder.add_edge(START, NodeName.QUERY_PLANNER.value)
     builder.add_conditional_edges(
         NodeName.QUERY_PLANNER.value,
@@ -91,7 +127,17 @@ def create_graph_builder(
         route_after_classifier,
         {"validate": NodeName.EVIDENCE_VALIDATOR.value, "stop": END},
     )
-    builder.add_edge(NodeName.EVIDENCE_VALIDATOR.value, END)
+    builder.add_conditional_edges(
+        NodeName.EVIDENCE_VALIDATOR.value,
+        route_after_evidence_validator,
+        {"retrieve_nvidia": NodeName.NVIDIA_RAG.value, "stop": END},
+    )
+    builder.add_conditional_edges(
+        NodeName.NVIDIA_RAG.value,
+        route_after_nvidia_rag,
+        {"recommend": NodeName.RECOMMENDATION.value, "stop": END},
+    )
+    builder.add_edge(NodeName.RECOMMENDATION.value, END)
     return builder
 
 
@@ -102,6 +148,8 @@ def compile_analysis_workflow(
     extractor: GraphNode,
     startup_classifier: GraphNode,
     evidence_validator: GraphNode,
+    nvidia_rag: GraphNode,
+    recommendation: GraphNode,
 ) -> AnalysisWorkflow:
     workflow = create_graph_builder(
         query_planner=query_planner,
@@ -109,5 +157,7 @@ def compile_analysis_workflow(
         extractor=extractor,
         startup_classifier=startup_classifier,
         evidence_validator=evidence_validator,
+        nvidia_rag=nvidia_rag,
+        recommendation=recommendation,
     ).compile()
     return cast(AnalysisWorkflow, workflow)

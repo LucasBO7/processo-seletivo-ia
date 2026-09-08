@@ -45,6 +45,63 @@ def test_settings_parse_nested_values() -> None:
     assert settings.knowledge_ingestion.pipeline_version == "knowledge-v1"
     assert settings.knowledge_ingestion.chunk_max_characters == 1_500
     assert settings.knowledge_ingestion.chunk_overlap_characters == 150
+    assert settings.nvidia_rag.vector_top_k == 20
+    assert settings.nvidia_rag.lexical_top_k == 20
+    assert settings.nvidia_rag.max_attempts == 3
+    assert settings.nvidia_rag.vector_weight + settings.nvidia_rag.lexical_weight == 1
+    assert settings.recommendation.max_recommendations_per_startup == 10
+    assert settings.recommendation.max_repair_attempts == 1
+
+
+def test_nvidia_rag_rejects_invalid_weights_and_limits() -> None:
+    with pytest.raises(ValidationError, match="weights"):
+        Settings(
+            _env_file=None,
+            postgres={"url": "postgresql+psycopg://user:secret@localhost/database"},
+            qdrant={"url": "http://localhost:6333"},
+            nvidia_rag={"vector_weight": 0.8, "lexical_weight": 0.8},
+        )
+
+    with pytest.raises(ValidationError, match="rerank_top_n"):
+        Settings(
+            _env_file=None,
+            postgres={"url": "postgresql+psycopg://user:secret@localhost/database"},
+            qdrant={"url": "http://localhost:6333"},
+            nvidia_rag={"fused_top_k": 5, "rerank_top_n": 6},
+        )
+
+
+def test_recommendation_limits_parse_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("RECOMMENDATION__MAX_NEEDS_PER_STARTUP", "8")
+    monkeypatch.setenv("RECOMMENDATION__MAX_NVIDIA_CHUNKS", "6")
+    monkeypatch.setenv("RECOMMENDATION__MAX_REPAIR_ATTEMPTS", "0")
+    settings = Settings(
+        _env_file=None,
+        postgres={"url": "postgresql+psycopg://user:secret@localhost/database"},
+        qdrant={"url": "http://localhost:6333"},
+    )
+
+    assert settings.recommendation.max_needs_per_startup == 8
+    assert settings.recommendation.max_nvidia_chunks == 6
+    assert settings.recommendation.max_repair_attempts == 0
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("max_recommendations_per_startup", 51),
+        ("max_context_characters", 999),
+        ("max_repair_attempts", 2),
+    ],
+)
+def test_recommendation_rejects_invalid_limits(field: str, value: int) -> None:
+    with pytest.raises(ValidationError, match=field):
+        Settings(
+            _env_file=None,
+            postgres={"url": "postgresql+psycopg://user:secret@localhost/database"},
+            qdrant={"url": "http://localhost:6333"},
+            recommendation={field: value},
+        )
 
 
 def test_knowledge_ingestion_rejects_invalid_overlap() -> None:

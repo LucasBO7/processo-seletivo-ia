@@ -18,7 +18,7 @@ from app.graph.agents.retriever import RetrieverAgent
 from app.graph.agents.startup_classifier import StartupClassifierAgent
 from app.graph.builder import compile_analysis_workflow
 from app.graph.model_policy import ModelRegistry
-from app.graph.state import empty_state
+from app.graph.state import AppState, empty_state
 from app.infrastructure.persistence.database import create_engine, create_session_factory
 from app.infrastructure.persistence.repositories import (
     SqlAlchemyKnowledgeChunkRepository,
@@ -30,6 +30,11 @@ from app.infrastructure.vector.qdrant import create_qdrant_client, ensure_collec
 from tests.fakes.providers import FakeChatModel, SequenceChatModel
 
 pytestmark = pytest.mark.integration
+
+
+async def passthrough_nvidia_rag(state: AppState) -> AppState:
+    del state
+    return AppState()
 
 
 def integration_settings() -> Settings:
@@ -224,6 +229,8 @@ async def test_schema_repositories_and_qdrant_are_consistent() -> None:
                 ),
                 config=settings.evidence_validator,
             ),
+            nvidia_rag=passthrough_nvidia_rag,
+            recommendation=passthrough_nvidia_rag,
         )
         workflow_result = await workflow.ainvoke(
             empty_state(

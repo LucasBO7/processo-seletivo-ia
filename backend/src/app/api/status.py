@@ -14,6 +14,9 @@ ERROR_STATUS_BY_CODE = {
     "classifier_unavailable": status.HTTP_503_SERVICE_UNAVAILABLE,
     "evidence_validator_invalid_output": status.HTTP_502_BAD_GATEWAY,
     "evidence_validator_unavailable": status.HTTP_503_SERVICE_UNAVAILABLE,
+    "nvidia_rag_retrieval_unavailable": status.HTTP_503_SERVICE_UNAVAILABLE,
+    "recommendation_invalid_output": status.HTTP_502_BAD_GATEWAY,
+    "recommendation_unavailable": status.HTTP_503_SERVICE_UNAVAILABLE,
 }
 
 

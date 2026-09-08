@@ -4,7 +4,9 @@ Plataforma idealizada para apoiar a NVIDIA na identificação, qualificação e 
 
 Desenvolvido por Lucas Bianchezzi Oliveira ([@LucasBO7](https://github.com/LucasBO7)).
 
-> Estado atual: o backend executa o fluxo parcial Query Planner → Retriever pelo LangGraph e expõe a busca para integração com o frontend. Os demais agentes do pipeline continuam pendentes.
+> Estado atual: o backend executa Query Planner → Retriever → Extractor →
+> Classifier → Evidence Validator → NVIDIA RAG pelo LangGraph e expõe o
+> resultado para integração com o frontend. Recomendação e briefing continuam pendentes.
 
 ## 1. Contexto
 
@@ -356,8 +358,9 @@ Todas as chaves aceitas e valores locais não sensíveis estão em `backend/.env
 | `EXTRACTOR__` | limites de fontes, contexto, fatos, listas e reparo da extração |
 | `STARTUP_CLASSIFIER__` | limites de fontes, contexto, justificativa, sinais e reparo da classificação |
 | `EVIDENCE_VALIDATOR__` | limites de fontes, itens, contexto, justificativa e reparo da validação |
-| `EMBEDDINGS__` | futuro modelo de embeddings |
-| `RERANKER__` | adaptador de reranking Cohere |
+| `NVIDIA_RAG__` | limites da busca híbrida, weighted RRF, suficiência e tentativas |
+| `EMBEDDINGS__` | modelo OpenAI-compatible usado pela busca vetorial |
+| `RERANKER__` | adaptador de reranking Cohere e credencial opcional |
 
 Use dois sublinhados para separar grupo e campo. Chaves reais são opcionais nesta fundação e nunca devem ser adicionadas ao `.env.example` ou aos logs.
 
@@ -503,8 +506,7 @@ PostgreSQL e no Qdrant. As 16 tecnologias obrigatórias do TAPI são verificadas
 
 O PostgreSQL é a fonte de verdade. A URL oficial é armazenada obrigatoriamente em
 `knowledge_documents.source_url` e replicada nos metadados dos chunks e no
-payload do Qdrant. O BM25 é reconstruído dos chunks persistidos; a busca híbrida,
-o RAG Agent, reranking e recomendações ainda não fazem parte desta entrega.
+payload do Qdrant. O BM25 é reconstruído dos chunks persistidos.
 
 ```powershell
 uv run --project backend alembic -c backend/alembic.ini upgrade head
@@ -515,7 +517,27 @@ uv run --project backend startup-radar-knowledge verify
 Consulte `backend/scripts/README.md` para dry-run offline, filtros e recuperação
 de falhas.
 
-### 7.10. Qualidade e testes do backend
+### 7.10. NVIDIA RAG Agent
+
+Após o Evidence Validator, perfis com ao menos um fato aprovado consultam a base
+NVIDIA. O nó combina Qdrant e BM25 usando weighted RRF, resolve os trechos e a
+`source_url` canônica no PostgreSQL e aplica o reranker quando configurado. Cada
+resultado expõe os scores vetorial, lexical, híbrido e de reranking, além dos UUIDs
+e localizadores necessários para citação.
+
+Se Qdrant ou BM25 falhar isoladamente, o outro canal continua. Se o reranker não
+estiver configurado ou falhar, a ordem híbrida é preservada. O agente amplia a
+busca deterministicamente até `NVIDIA_RAG__MAX_ATTEMPTS` e sinaliza
+`insufficient` quando o contexto mínimo não for encontrado. Ele não usa LLM e não
+produz recomendações.
+
+Configure `EMBEDDINGS__PROVIDER=openai-compatible`, `EMBEDDINGS__BASE_URL` e
+`EMBEDDINGS__API_KEY` para habilitar o canal vetorial. Configure
+`RERANKER__API_KEY` para habilitar Cohere; sem essas credenciais, o fluxo usa os
+fallbacks documentados. O resultado aparece em `nvidia_contexts` na resposta de
+`POST /api/v1/search`.
+
+### 7.11. Qualidade e testes do backend
 
 Execute cada verificação separadamente:
 
@@ -555,7 +577,7 @@ testes reproduzíveis e não exige Docker no ambiente local de desenvolvimento.
 
 Para atualizar uma dependência de forma consciente, altere sua restrição com `uv add --project backend <pacote>` e revise o diff de `backend/pyproject.toml` e `backend/uv.lock` antes de executar os testes.
 
-### 7.11. Migrações
+### 7.12. Migrações
 
 ```bash
 uv run --project backend alembic -c backend/alembic.ini current
@@ -792,4 +814,22 @@ As alternativas retiradas do escopo desta fundação estão registradas em [docu
 
 ## 9. Próxima etapa
 
-A lógica dos seis agentes restantes, a ingestão de dados e a integração visual com o frontend continuam exigindo especificações próprias. Cada nova etapa deve reutilizar as portas e os modelos da fundação sem acoplar domínio a FastAPI, SQLAlchemy, Qdrant ou SDKs externos.
+As próximas capacidades e a integração visual com o frontend continuam exigindo
+especificações próprias. Cada nova etapa deve reutilizar as portas e os modelos da
+fundação sem acoplar domínio a FastAPI, SQLAlchemy, Qdrant ou SDKs externos.
+
+## 10. Recommendation Agent
+
+Depois que o NVIDIA RAG produz contexto `sufficient`, o fluxo usa o modelo pesado
+configurado para propor candidatos e valida localmente toda referência antes de
+publicá-los. Cada item de `recommendations` em `POST /api/v1/search` relaciona
+necessidades permitidas, uma tecnologia canônica, evidências separadas da startup e
+da documentação NVIDIA, prioridade e complexidade calculadas deterministicamente e
+uma próxima ação limitada para o time NVIDIA.
+
+O agente não é chamado sem perfil utilizável, necessidade rastreável, contexto NVIDIA
+suficiente e fato de negócio aprovado. Uma lista vazia válida retorna HTTP 200; saída
+inválida persistente retorna 502 e indisponibilidade do provedor retorna 503. O lote é
+atômico por startup, portanto uma referência fabricada não publica recomendações
+parciais daquela empresa. Os limites operacionais estão no grupo
+`RECOMMENDATION__*` de `backend/.env.example`.

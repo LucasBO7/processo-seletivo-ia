@@ -277,6 +277,8 @@ def test_search_returns_workflow_plan_candidates_and_sources(settings: Settings)
     assert body["rejected_claims"] == []
     assert body["conflicting_claims"] == []
     assert body["evidence_gaps"] == []
+    assert body["nvidia_contexts"] == []
+    assert body["recommendations"] == []
     assert workflow.calls[0]["correlation_id"] == "search-123"
     assert workflow.calls[0]["query"] == "startups"
 
@@ -435,6 +437,9 @@ def test_search_treats_no_supported_claims_as_success(settings: Settings) -> Non
         ("classifier_unavailable", 503),
         ("evidence_validator_invalid_output", 502),
         ("evidence_validator_unavailable", 503),
+        ("nvidia_rag_retrieval_unavailable", 503),
+        ("recommendation_invalid_output", 502),
+        ("recommendation_unavailable", 503),
     ],
 )
 def test_search_maps_recoverable_errors(
@@ -480,9 +485,12 @@ def test_openapi_exposes_current_functional_routes(client: TestClient) -> None:
     response = client.get("/api/v1/openapi.json")
 
     assert response.status_code == 200
-    paths = response.json()["paths"]
+    schema = response.json()
+    paths = schema["paths"]
     assert "/api/v1/query-plans" in paths
     assert "/api/v1/search" in paths
+    search_schema = schema["components"]["schemas"]["SearchResponse"]
+    assert "recommendations" in search_schema["properties"]
     assert "/health/live" not in paths
     assert "/health/ready" not in paths
     schemas = response.json()["components"]["schemas"]
@@ -504,6 +512,9 @@ def test_openapi_exposes_current_functional_routes(client: TestClient) -> None:
     assert "ClassificationValidation" in schemas
     assert "EvidenceStatus" in schemas
     assert "SourceVerdict" in schemas
+    assert "NvidiaStartupContext" in schemas
+    assert "NvidiaRetrievedChunk" in schemas
+    assert "NvidiaContextSufficiency" in schemas
 
 
 @pytest.mark.parametrize("path", ["/health/live", "/health/ready"])

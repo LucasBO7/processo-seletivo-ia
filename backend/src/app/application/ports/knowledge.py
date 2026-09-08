@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
 from uuid import UUID
@@ -12,6 +13,12 @@ from app.application.contracts.knowledge_ingestion import (
     PreparedKnowledgeChunk,
 )
 from app.domain.models import KnowledgeChunk, KnowledgeDocument
+
+
+@dataclass(frozen=True, slots=True)
+class KnowledgeSearchHit:
+    chunk_id: UUID
+    score: float
 
 
 class KnowledgeSourceClient(Protocol):
@@ -62,3 +69,19 @@ class KnowledgeVectorStore(Protocol):
 
 class KnowledgeLexicalIndex(Protocol):
     def build_and_fingerprint(self, chunks: Sequence[KnowledgeChunk]) -> str: ...
+
+
+class KnowledgeRetrievalRepository(Protocol):
+    async def list_documents(self) -> list[KnowledgeDocument]: ...
+
+    async def list_chunks(self) -> list[KnowledgeChunk]: ...
+
+
+class KnowledgeVectorSearch(Protocol):
+    async def search(self, vector: Sequence[float], *, limit: int) -> list[KnowledgeSearchHit]: ...
+
+
+class KnowledgeLexicalSearch(Protocol):
+    def search(
+        self, query: str, chunks: Sequence[KnowledgeChunk], *, limit: int
+    ) -> list[KnowledgeSearchHit]: ...

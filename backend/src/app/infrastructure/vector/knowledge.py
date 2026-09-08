@@ -6,6 +6,7 @@ from uuid import UUID
 from qdrant_client import AsyncQdrantClient, models
 
 from app.application.contracts.knowledge_ingestion import PreparedKnowledgeChunk
+from app.application.ports.knowledge import KnowledgeSearchHit
 
 
 class QdrantKnowledgeVectorStore:
@@ -78,6 +79,19 @@ class QdrantKnowledgeVectorStore:
                 result[UUID(str(point.id))] = dict(point.payload or {})
             if offset is None:
                 return result
+
+    async def search(self, vector: Sequence[float], *, limit: int) -> list[KnowledgeSearchHit]:
+        response = await self._client.query_points(
+            collection_name=self._collection_name,
+            query=list(vector),
+            limit=limit,
+            with_payload=False,
+            with_vectors=False,
+        )
+        return [
+            KnowledgeSearchHit(chunk_id=UUID(str(point.id)), score=float(point.score))
+            for point in response.points
+        ]
 
     async def _scroll_ids(self, query_filter: models.Filter | None = None) -> set[UUID]:
         result: set[UUID] = set()

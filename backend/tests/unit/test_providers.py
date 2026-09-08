@@ -58,6 +58,7 @@ async def test_application_resources_expose_the_shared_models(
     compiled_extractor: object | None = None
     compiled_startup_classifier: object | None = None
     compiled_evidence_validator: object | None = None
+    compiled_nvidia_rag: object | None = None
 
     class StubWorkflow:
         async def ainvoke(self, state: AppState) -> AppState:
@@ -66,7 +67,7 @@ async def test_application_resources_expose_the_shared_models(
     workflow = StubWorkflow()
 
     def compile_workflow(**components: object) -> StubWorkflow:
-        nonlocal compiled_evidence_validator, compiled_extractor
+        nonlocal compiled_evidence_validator, compiled_extractor, compiled_nvidia_rag
         nonlocal compiled_query_planner, compiled_startup_classifier
         nonlocal workflow_calls
         workflow_calls += 1
@@ -74,6 +75,7 @@ async def test_application_resources_expose_the_shared_models(
         compiled_extractor = components["extractor"]
         compiled_startup_classifier = components["startup_classifier"]
         compiled_evidence_validator = components["evidence_validator"]
+        compiled_nvidia_rag = components["nvidia_rag"]
         return workflow
 
     class StubEngine:
@@ -111,5 +113,6 @@ async def test_application_resources_expose_the_shared_models(
     assert resources.extractor is compiled_extractor
     assert resources.startup_classifier is compiled_startup_classifier
     assert resources.evidence_validator is compiled_evidence_validator
+    assert resources.nvidia_rag is compiled_nvidia_rag
     assert resources.workflow is workflow
     assert workflow_calls == 1

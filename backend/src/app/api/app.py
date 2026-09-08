@@ -18,7 +18,9 @@ from app.core.logging import configure_logging
 from app.core.resources import ApplicationResources
 from app.graph.agents.evidence_validator import create_evidence_validator_agent
 from app.graph.agents.extractor import create_extractor_agent
+from app.graph.agents.nvidia_rag import NvidiaRagAgent
 from app.graph.agents.query_planner import create_query_planner_agent
+from app.graph.agents.recommendation import create_recommendation_agent
 from app.graph.agents.retriever import RetrieverAgent
 from app.graph.agents.startup_classifier import create_startup_classifier_agent
 from app.graph.builder import compile_analysis_workflow
@@ -28,11 +30,16 @@ from app.infrastructure.persistence.database import (
     create_engine,
     create_session_factory,
 )
+from app.infrastructure.persistence.knowledge import SqlAlchemyKnowledgeIngestionRepository
 from app.infrastructure.persistence.repositories import (
     SqlAlchemyStartupDocumentRepository,
     SqlAlchemyStartupRepository,
 )
+from app.infrastructure.providers.cohere import CohereReranker
+from app.infrastructure.providers.embeddings import OpenAICompatibleEmbeddingModel
 from app.infrastructure.providers.groq import create_groq_chat_model
+from app.infrastructure.retrieval.knowledge_bm25 import KnowledgeBM25Index
+from app.infrastructure.vector.knowledge import QdrantKnowledgeVectorStore
 from app.infrastructure.vector.qdrant import (
     QdrantReadinessProbe,
     create_qdrant_client,
@@ -77,20 +84,37 @@ async def create_resources(settings: Settings) -> ApplicationResources:
     evidence_validator = create_evidence_validator_agent(
         registry=model_registry, config=settings.evidence_validator
     )
+    qdrant = create_qdrant_client(settings.qdrant)
+    try:
+        await ensure_collection(qdrant, settings.qdrant)
+    except Exception:
+        # The RAG node can continue with BM25 and reports Qdrant degradation safely.
+        pass
+    embedding_model = _create_embedding_model(settings)
+    reranker = _create_reranker(settings)
+    knowledge_repository = SqlAlchemyKnowledgeIngestionRepository(sessions)
+    nvidia_rag = NvidiaRagAgent(
+        repository=knowledge_repository,
+        vector_search=QdrantKnowledgeVectorStore(qdrant, settings.qdrant.collection_name),
+        lexical_search=KnowledgeBM25Index(),
+        embedding_model=embedding_model,
+        reranker=reranker,
+        config=settings.nvidia_rag,
+        embedding_dimension=settings.qdrant.embedding_dimension,
+    )
+    recommendation = create_recommendation_agent(
+        registry=model_registry,
+        config=settings.recommendation,
+    )
     workflow = compile_analysis_workflow(
         query_planner=query_planner,
         retriever=retriever,
         extractor=extractor,
         startup_classifier=startup_classifier,
         evidence_validator=evidence_validator,
+        nvidia_rag=nvidia_rag,
+        recommendation=recommendation,
     )
-    qdrant = create_qdrant_client(settings.qdrant)
-    try:
-        await ensure_collection(qdrant, settings.qdrant)
-    except Exception:
-        await qdrant.close()
-        await engine.dispose()
-        raise
     return ApplicationResources(
         engine=engine,
         sessions=sessions,
@@ -104,7 +128,33 @@ async def create_resources(settings: Settings) -> ApplicationResources:
         extractor=extractor,
         startup_classifier=startup_classifier,
         evidence_validator=evidence_validator,
+        embedding_model=embedding_model,
+        reranker=reranker,
+        nvidia_rag=nvidia_rag,
+        recommendation=recommendation,
         workflow=workflow,
+    )
+
+
+def _create_embedding_model(settings: Settings) -> OpenAICompatibleEmbeddingModel | None:
+    config = settings.embeddings
+    if config.provider == "unset":
+        return None
+    if config.provider not in {"openai", "openai-compatible"}:
+        raise ValueError("unsupported embedding provider")
+    return OpenAICompatibleEmbeddingModel(config)
+
+
+def _create_reranker(settings: Settings) -> CohereReranker | None:
+    config = settings.reranker
+    if config.api_key is None:
+        return None
+    if config.provider != "cohere":
+        raise ValueError("unsupported reranker provider")
+    return CohereReranker(
+        api_key=config.api_key.get_secret_value(),
+        model=config.model,
+        timeout_seconds=config.timeout_seconds,
     )
 
 

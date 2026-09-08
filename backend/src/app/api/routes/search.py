@@ -17,7 +17,9 @@ from app.application.contracts.evidence_validation import (
     ValidatedStartupProfile,
 )
 from app.application.contracts.extraction import StructuredStartupProfile
+from app.application.contracts.nvidia_rag import NvidiaStartupContext
 from app.application.contracts.query_plan import QueryPlan
+from app.application.contracts.recommendation import StartupRecommendation
 from app.core.resources import ApplicationResources
 from app.graph.state import empty_state
 
@@ -58,6 +60,8 @@ class SearchResponse(BaseModel):
     rejected_claims: list[ClaimValidation]
     conflicting_claims: list[ClaimValidation]
     evidence_gaps: list[ClaimValidation]
+    nvidia_contexts: list[NvidiaStartupContext]
+    recommendations: list[StartupRecommendation]
     warnings: list[str]
     errors: list[RecoverableErrorResponse]
     metrics: dict[str, float]
@@ -105,6 +109,8 @@ async def search(payload: SearchRequest, request: Request) -> JSONResponse:
         rejected_claims=final_state.get("rejected_claims", []),
         conflicting_claims=final_state.get("conflicting_claims", []),
         evidence_gaps=final_state.get("evidence_gaps", []),
+        nvidia_contexts=final_state.get("nvidia_contexts", []),
+        recommendations=final_state.get("recommendations", []),
         warnings=final_state.get("warnings", []),
         errors=[RecoverableErrorResponse.from_domain(error) for error in errors],
         metrics=final_state.get("metrics", {}),

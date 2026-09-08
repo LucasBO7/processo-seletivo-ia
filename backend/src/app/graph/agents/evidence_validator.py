@@ -237,6 +237,11 @@ class EvidenceValidatorAgent:
         ]
         if profiles and not validated_claims:
             warnings.append("validator_no_supported_claims")
+        if not any(
+            any(getattr(profile, field.value) not in (None, []) for field in ProfileField)
+            for profile in validated_profiles
+        ):
+            warnings.append("nvidia_rag_no_usable_profiles")
 
         metrics = dict(state.get("metrics", {}))
         metrics.update(

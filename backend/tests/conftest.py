@@ -32,6 +32,8 @@ def block_live_llm_clients(monkeypatch: pytest.MonkeyPatch) -> None:
         raise AssertionError("Live LLM clients are forbidden in automated tests.")
 
     monkeypatch.setattr("app.infrastructure.providers.groq.ChatGroq", blocked_client)
+    monkeypatch.setattr("app.infrastructure.providers.cohere.cohere.AsyncClientV2", blocked_client)
+    monkeypatch.setattr("app.api.app.OpenAICompatibleEmbeddingModel", blocked_client)
 
 
 @pytest.fixture(autouse=True)
@@ -104,6 +106,7 @@ class StubResources:
         self.extractor = None
         self.startup_classifier = None
         self.evidence_validator = None
+        self.recommendation = None
         self.workflow = workflow or StubWorkflow()
         self.closed = False
 

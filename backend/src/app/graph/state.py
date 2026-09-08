@@ -11,9 +11,10 @@ from app.application.contracts.evidence_validation import (
     ValidatedStartupProfile,
 )
 from app.application.contracts.extraction import StructuredStartupProfile
+from app.application.contracts.nvidia_rag import NvidiaStartupContext
 from app.application.contracts.query_plan import QueryPlan
+from app.application.contracts.recommendation import StartupRecommendation
 from app.domain.models import (
-    Recommendation,
     RecoverableError,
     SourceReference,
     TechnicalGap,
@@ -56,7 +57,8 @@ class AppState(TypedDict, total=False):
     retrieval_query: str
     candidate_chunks: list[RetrievedChunk]
     reranked_chunks: list[RetrievedChunk]
-    recommendations: list[Recommendation]
+    nvidia_contexts: list[NvidiaStartupContext]
+    recommendations: list[StartupRecommendation]
     briefing: str
     warnings: list[str]
     errors: list[RecoverableError]
@@ -84,6 +86,7 @@ def empty_state(*, run_id: UUID, correlation_id: str, query: str) -> AppState:
         technical_gaps=[],
         candidate_chunks=[],
         reranked_chunks=[],
+        nvidia_contexts=[],
         recommendations=[],
         warnings=[],
         errors=[],
