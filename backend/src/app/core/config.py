@@ -196,6 +196,22 @@ class RecommendationConfig(BaseModel):
     max_repair_attempts: int = Field(default=1, ge=0, le=1)
 
 
+class BriefingConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    max_startups: int = Field(default=20, ge=1, le=100)
+    max_facts_per_section: int = Field(default=20, ge=1, le=100)
+    max_signals: int = Field(default=20, ge=1, le=100)
+    max_gaps: int = Field(default=20, ge=1, le=100)
+    max_recommendations: int = Field(default=20, ge=1, le=100)
+    max_citations: int = Field(default=50, ge=2, le=200)
+    max_statements: int = Field(default=20, ge=1, le=100)
+    max_context_characters: int = Field(default=30_000, ge=1_000, le=200_000)
+    max_statement_length: int = Field(default=1_000, ge=50, le=4_000)
+    max_markdown_characters: int = Field(default=50_000, ge=1_000, le=200_000)
+    max_repair_attempts: int = Field(default=1, ge=0, le=1)
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=BACKEND_ROOT / ".env",
@@ -221,6 +237,7 @@ class Settings(BaseSettings):
     knowledge_ingestion: KnowledgeIngestionConfig = KnowledgeIngestionConfig()
     nvidia_rag: NvidiaRagConfig = NvidiaRagConfig()
     recommendation: RecommendationConfig = RecommendationConfig()
+    briefing: BriefingConfig = BriefingConfig()
     embeddings: ModelProviderConfig = Field(
         default_factory=lambda: ModelProviderConfig(provider="unset", model="unset")
     )

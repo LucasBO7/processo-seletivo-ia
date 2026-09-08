@@ -29,6 +29,7 @@ class ApplicationResources:
     reranker: Reranker | None
     nvidia_rag: GraphNode
     recommendation: GraphNode
+    briefing: GraphNode
     workflow: AnalysisWorkflow
 
     async def close(self) -> None:

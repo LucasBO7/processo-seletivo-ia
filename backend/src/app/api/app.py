@@ -16,6 +16,7 @@ from app.api.routes.search import router as search_router
 from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging
 from app.core.resources import ApplicationResources
+from app.graph.agents.briefing import create_briefing_agent
 from app.graph.agents.evidence_validator import create_evidence_validator_agent
 from app.graph.agents.extractor import create_extractor_agent
 from app.graph.agents.nvidia_rag import NvidiaRagAgent
@@ -106,6 +107,7 @@ async def create_resources(settings: Settings) -> ApplicationResources:
         registry=model_registry,
         config=settings.recommendation,
     )
+    briefing = create_briefing_agent(registry=model_registry, config=settings.briefing)
     workflow = compile_analysis_workflow(
         query_planner=query_planner,
         retriever=retriever,
@@ -114,6 +116,7 @@ async def create_resources(settings: Settings) -> ApplicationResources:
         evidence_validator=evidence_validator,
         nvidia_rag=nvidia_rag,
         recommendation=recommendation,
+        briefing=briefing,
     )
     return ApplicationResources(
         engine=engine,
@@ -132,6 +135,7 @@ async def create_resources(settings: Settings) -> ApplicationResources:
         reranker=reranker,
         nvidia_rag=nvidia_rag,
         recommendation=recommendation,
+        briefing=briefing,
         workflow=workflow,
     )
 

@@ -231,6 +231,7 @@ async def test_schema_repositories_and_qdrant_are_consistent() -> None:
             ),
             nvidia_rag=passthrough_nvidia_rag,
             recommendation=passthrough_nvidia_rag,
+            briefing=passthrough_nvidia_rag,
         )
         workflow_result = await workflow.ainvoke(
             empty_state(

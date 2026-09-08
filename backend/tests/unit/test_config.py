@@ -51,6 +51,9 @@ def test_settings_parse_nested_values() -> None:
     assert settings.nvidia_rag.vector_weight + settings.nvidia_rag.lexical_weight == 1
     assert settings.recommendation.max_recommendations_per_startup == 10
     assert settings.recommendation.max_repair_attempts == 1
+    assert settings.briefing.max_startups == 20
+    assert settings.briefing.max_markdown_characters == 50_000
+    assert settings.briefing.max_repair_attempts == 1
 
 
 def test_nvidia_rag_rejects_invalid_weights_and_limits() -> None:
@@ -101,6 +104,39 @@ def test_recommendation_rejects_invalid_limits(field: str, value: int) -> None:
             postgres={"url": "postgresql+psycopg://user:secret@localhost/database"},
             qdrant={"url": "http://localhost:6333"},
             recommendation={field: value},
+        )
+
+
+def test_briefing_limits_parse_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("BRIEFING__MAX_STARTUPS", "8")
+    monkeypatch.setenv("BRIEFING__MAX_STATEMENTS", "6")
+    monkeypatch.setenv("BRIEFING__MAX_REPAIR_ATTEMPTS", "0")
+    settings = Settings(
+        _env_file=None,
+        postgres={"url": "postgresql+psycopg://user:secret@localhost/database"},
+        qdrant={"url": "http://localhost:6333"},
+    )
+
+    assert settings.briefing.max_startups == 8
+    assert settings.briefing.max_statements == 6
+    assert settings.briefing.max_repair_attempts == 0
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("max_startups", 101),
+        ("max_context_characters", 999),
+        ("max_repair_attempts", 2),
+    ],
+)
+def test_briefing_rejects_invalid_limits(field: str, value: int) -> None:
+    with pytest.raises(ValidationError, match=field):
+        Settings(
+            _env_file=None,
+            postgres={"url": "postgresql+psycopg://user:secret@localhost/database"},
+            qdrant={"url": "http://localhost:6333"},
+            briefing={field: value},
         )
 
 

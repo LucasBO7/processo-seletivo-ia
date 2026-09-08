@@ -279,6 +279,7 @@ def test_search_returns_workflow_plan_candidates_and_sources(settings: Settings)
     assert body["evidence_gaps"] == []
     assert body["nvidia_contexts"] == []
     assert body["recommendations"] == []
+    assert body["briefings"] == []
     assert workflow.calls[0]["correlation_id"] == "search-123"
     assert workflow.calls[0]["query"] == "startups"
 
@@ -440,6 +441,8 @@ def test_search_treats_no_supported_claims_as_success(settings: Settings) -> Non
         ("nvidia_rag_retrieval_unavailable", 503),
         ("recommendation_invalid_output", 502),
         ("recommendation_unavailable", 503),
+        ("briefing_invalid_output", 502),
+        ("briefing_unavailable", 503),
     ],
 )
 def test_search_maps_recoverable_errors(
@@ -491,6 +494,7 @@ def test_openapi_exposes_current_functional_routes(client: TestClient) -> None:
     assert "/api/v1/search" in paths
     search_schema = schema["components"]["schemas"]["SearchResponse"]
     assert "recommendations" in search_schema["properties"]
+    assert "briefings" in search_schema["properties"]
     assert "/health/live" not in paths
     assert "/health/ready" not in paths
     schemas = response.json()["components"]["schemas"]
@@ -503,6 +507,7 @@ def test_openapi_exposes_current_functional_routes(client: TestClient) -> None:
     assert "ExtractionSource" in schemas
     assert "ProfileField" in schemas
     assert "StartupClassification" in schemas
+    assert "StartupBriefing" in schemas
     assert "ClassificationStatus" in schemas
     assert "ConfidenceLevel" in schemas
     assert "ClassificationSignalType" in schemas

@@ -24,6 +24,7 @@ from app.application.contracts.nvidia_rag import (
     NvidiaStartupContext,
 )
 from app.application.contracts.query_plan import QueryPlan
+from app.application.contracts.recommendation import StartupRecommendation
 from app.domain.models import RecoverableError, SourceReference
 from app.graph.builder import (
     compile_analysis_workflow,
@@ -33,6 +34,7 @@ from app.graph.builder import (
     route_after_extractor,
     route_after_nvidia_rag,
     route_after_query_planner,
+    route_after_recommendation,
     route_after_retriever,
 )
 from app.graph.nodes import ALL_NODE_NAMES, NodeName
@@ -101,6 +103,7 @@ def test_builder_registers_current_nodes() -> None:
         evidence_validator=RecordingNode(AppState()),
         nvidia_rag=RecordingNode(AppState()),
         recommendation=RecordingNode(AppState()),
+        briefing=RecordingNode(AppState()),
     )
 
     assert set(builder.nodes) == {
@@ -111,6 +114,7 @@ def test_builder_registers_current_nodes() -> None:
         "evidence_validator",
         "nvidia_rag",
         "recommendation",
+        "briefing",
     }
 
 
@@ -123,6 +127,14 @@ def test_route_after_nvidia_rag_requires_matching_sufficient_citable_context() -
     )
     assert route_after_nvidia_rag(AppState(validated_profiles=[profile])) == "stop"
     assert source_ids
+
+
+def test_route_after_recommendation_requires_a_valid_recommendation() -> None:
+    recommendation = StartupRecommendation.model_construct(startup_id=uuid4())
+
+    assert route_after_recommendation(AppState(recommendations=[recommendation])) == "brief"
+    assert route_after_recommendation(AppState(recommendations=[])) == "stop"
+    assert route_after_recommendation(AppState(recommendations=[{"invalid": True}])) == "stop"
 
 
 def _usable_profile_for_recommendation() -> tuple[ValidatedStartupProfile, list[UUID]]:
@@ -309,6 +321,7 @@ async def test_workflow_runs_retriever_and_preserves_traceable_state() -> None:
         evidence_validator=evidence_validator,
         nvidia_rag=nvidia_rag,
         recommendation=RecordingNode(AppState()),
+        briefing=RecordingNode(AppState()),
     )
 
     result = await workflow.ainvoke(
@@ -361,6 +374,7 @@ async def test_workflow_runs_classifier_only_after_extractor_profile() -> None:
         evidence_validator=evidence_validator,
         nvidia_rag=nvidia_rag,
         recommendation=RecordingNode(AppState()),
+        briefing=RecordingNode(AppState()),
     )
 
     await workflow.ainvoke(empty_state(run_id=uuid4(), correlation_id="classify", query="startups"))
@@ -407,6 +421,7 @@ async def test_workflow_runs_nvidia_rag_only_after_usable_validated_profile() ->
         evidence_validator=RecordingNode(AppState(validated_profiles=[profile])),
         nvidia_rag=nvidia_rag,
         recommendation=RecordingNode(AppState()),
+        briefing=RecordingNode(AppState()),
     )
 
     await workflow.ainvoke(empty_state(run_id=uuid4(), correlation_id="nvidia", query="startups"))
@@ -426,7 +441,9 @@ async def test_workflow_runs_recommendation_after_sufficient_nvidia_context() ->
         title="Evidence",
         excerpt="Inference API",
     )
-    recommendation = RecordingNode(AppState(recommendations=[]))
+    generated_recommendation = StartupRecommendation.model_construct(startup_id=profile.startup_id)
+    recommendation = RecordingNode(AppState(recommendations=[generated_recommendation]))
+    briefing = RecordingNode(AppState())
     workflow = compile_analysis_workflow(
         query_planner=RecordingNode(AppState(query_plan=query_plan())),
         retriever=RecordingNode(
@@ -442,6 +459,7 @@ async def test_workflow_runs_recommendation_after_sufficient_nvidia_context() ->
         evidence_validator=RecordingNode(AppState(validated_profiles=[profile])),
         nvidia_rag=RecordingNode(AppState(nvidia_contexts=[context])),
         recommendation=recommendation,
+        briefing=briefing,
     )
 
     await workflow.ainvoke(
@@ -450,6 +468,8 @@ async def test_workflow_runs_recommendation_after_sufficient_nvidia_context() ->
 
     assert len(recommendation.calls) == 1
     assert recommendation.calls[0]["nvidia_contexts"] == [context]
+    assert len(briefing.calls) == 1
+    assert briefing.calls[0]["recommendations"] == [generated_recommendation]
 
 
 @pytest.mark.asyncio
@@ -469,6 +489,7 @@ async def test_workflow_stops_before_retriever_for_non_ready_plan(status: str) -
         evidence_validator=evidence_validator,
         nvidia_rag=nvidia_rag,
         recommendation=RecordingNode(AppState()),
+        briefing=RecordingNode(AppState()),
     )
 
     result = await workflow.ainvoke(
@@ -499,6 +520,7 @@ async def test_workflow_stops_before_retriever_when_planner_fails() -> None:
         evidence_validator=evidence_validator,
         nvidia_rag=nvidia_rag,
         recommendation=RecordingNode(AppState()),
+        briefing=RecordingNode(AppState()),
     )
 
     result = await workflow.ainvoke(
@@ -525,6 +547,7 @@ async def test_workflow_invocations_do_not_share_mutable_state() -> None:
         evidence_validator=evidence_validator,
         nvidia_rag=nvidia_rag,
         recommendation=RecordingNode(AppState()),
+        briefing=RecordingNode(AppState()),
     )
 
     first = await workflow.ainvoke(

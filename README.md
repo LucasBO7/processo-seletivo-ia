@@ -833,3 +833,19 @@ inválida persistente retorna 502 e indisponibilidade do provedor retorna 503. O
 atômico por startup, portanto uma referência fabricada não publica recomendações
 parciais daquela empresa. Os limites operacionais estão no grupo
 `RECOMMENDATION__*` de `backend/.env.example`.
+
+## 11. Briefing Agent
+
+Quando há ao menos uma recomendação válida, o fluxo executa o Briefing Agent e
+publica `briefings` em `POST /api/v1/search`. Cada briefing oferece um contrato
+estruturado para a interface e uma projeção Markdown determinística, reunindo perfil,
+maturidade de IA, sinais, stack, gaps, recomendações, prioridades, complexidade,
+ações sugeridas e possíveis oportunidades NVIDIA Inception.
+
+Fatos confirmados, inferências, incertezas e lacunas são identificados explicitamente.
+As conclusões carregam IDs que apontam para fontes da startup ou para chunks oficiais
+NVIDIA; inferências de recomendação exigem os dois tipos de fonte e oportunidades
+Inception exigem um chunk oficial específico. Dados sem fonte resolvível são omitidos
+com aviso, e falhas de modelo não expõem a mensagem original do provedor. Os limites
+operacionais estão no grupo `BRIEFING__*` de `backend/.env.example`. Esta etapa não
+implementa exportação visual nem persistência dos briefings.

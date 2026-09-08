@@ -6,6 +6,7 @@ from langgraph.graph import END, START, StateGraph
 
 from app.application.contracts.nvidia_rag import NvidiaContextStatus
 from app.application.contracts.query_plan import QueryPlanStatus
+from app.application.contracts.recommendation import StartupRecommendation
 from app.graph.contracts import AnalysisWorkflow, GraphNode
 from app.graph.nodes import NodeName
 from app.graph.state import AppState
@@ -16,6 +17,7 @@ RouteAfterExtractor = Literal["classify", "stop"]
 RouteAfterClassifier = Literal["validate", "stop"]
 RouteAfterEvidenceValidator = Literal["retrieve_nvidia", "stop"]
 RouteAfterNvidiaRag = Literal["recommend", "stop"]
+RouteAfterRecommendation = Literal["brief", "stop"]
 BLOCKING_PLANNER_ERRORS = {
     "query_empty",
     "query_too_long",
@@ -88,6 +90,15 @@ def route_after_nvidia_rag(state: AppState) -> RouteAfterNvidiaRag:
     return "recommend" if eligible else "stop"
 
 
+def route_after_recommendation(state: AppState) -> RouteAfterRecommendation:
+    """Build briefings only when at least one validated recommendation exists."""
+    return (
+        "brief"
+        if any(isinstance(item, StartupRecommendation) for item in state.get("recommendations", []))
+        else "stop"
+    )
+
+
 def create_graph_builder(
     *,
     query_planner: GraphNode,
@@ -97,6 +108,7 @@ def create_graph_builder(
     evidence_validator: GraphNode,
     nvidia_rag: GraphNode,
     recommendation: GraphNode,
+    briefing: GraphNode,
 ) -> StateGraph[AppState, None, AppState, AppState]:
     builder = StateGraph(AppState)
     builder.add_node(NodeName.QUERY_PLANNER.value, query_planner)
@@ -106,6 +118,7 @@ def create_graph_builder(
     builder.add_node(NodeName.EVIDENCE_VALIDATOR.value, evidence_validator)
     builder.add_node(NodeName.NVIDIA_RAG.value, nvidia_rag)
     builder.add_node(NodeName.RECOMMENDATION.value, recommendation)
+    builder.add_node(NodeName.BRIEFING.value, briefing)
     builder.add_edge(START, NodeName.QUERY_PLANNER.value)
     builder.add_conditional_edges(
         NodeName.QUERY_PLANNER.value,
@@ -137,7 +150,12 @@ def create_graph_builder(
         route_after_nvidia_rag,
         {"recommend": NodeName.RECOMMENDATION.value, "stop": END},
     )
-    builder.add_edge(NodeName.RECOMMENDATION.value, END)
+    builder.add_conditional_edges(
+        NodeName.RECOMMENDATION.value,
+        route_after_recommendation,
+        {"brief": NodeName.BRIEFING.value, "stop": END},
+    )
+    builder.add_edge(NodeName.BRIEFING.value, END)
     return builder
 
 
@@ -150,6 +168,7 @@ def compile_analysis_workflow(
     evidence_validator: GraphNode,
     nvidia_rag: GraphNode,
     recommendation: GraphNode,
+    briefing: GraphNode,
 ) -> AnalysisWorkflow:
     workflow = create_graph_builder(
         query_planner=query_planner,
@@ -159,5 +178,6 @@ def compile_analysis_workflow(
         evidence_validator=evidence_validator,
         nvidia_rag=nvidia_rag,
         recommendation=recommendation,
+        briefing=briefing,
     ).compile()
     return cast(AnalysisWorkflow, workflow)

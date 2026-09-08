@@ -107,6 +107,7 @@ class StubResources:
         self.startup_classifier = None
         self.evidence_validator = None
         self.recommendation = None
+        self.briefing = None
         self.workflow = workflow or StubWorkflow()
         self.closed = False
 

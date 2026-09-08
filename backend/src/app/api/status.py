@@ -17,6 +17,8 @@ ERROR_STATUS_BY_CODE = {
     "nvidia_rag_retrieval_unavailable": status.HTTP_503_SERVICE_UNAVAILABLE,
     "recommendation_invalid_output": status.HTTP_502_BAD_GATEWAY,
     "recommendation_unavailable": status.HTTP_503_SERVICE_UNAVAILABLE,
+    "briefing_invalid_output": status.HTTP_502_BAD_GATEWAY,
+    "briefing_unavailable": status.HTTP_503_SERVICE_UNAVAILABLE,
 }
 
 

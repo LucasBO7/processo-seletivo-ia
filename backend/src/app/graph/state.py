@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, TypedDict
 from uuid import UUID
 
+from app.application.contracts.briefing import StartupBriefing
 from app.application.contracts.classification import StartupClassification
 from app.application.contracts.evidence_validation import (
     ClaimValidation,
@@ -59,7 +60,7 @@ class AppState(TypedDict, total=False):
     reranked_chunks: list[RetrievedChunk]
     nvidia_contexts: list[NvidiaStartupContext]
     recommendations: list[StartupRecommendation]
-    briefing: str
+    briefings: list[StartupBriefing]
     warnings: list[str]
     errors: list[RecoverableError]
     metrics: dict[str, float]
@@ -88,6 +89,7 @@ def empty_state(*, run_id: UUID, correlation_id: str, query: str) -> AppState:
         reranked_chunks=[],
         nvidia_contexts=[],
         recommendations=[],
+        briefings=[],
         warnings=[],
         errors=[],
         metrics={},

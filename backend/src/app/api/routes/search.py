@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict
 
 from app.api.routes.query_plans import RecoverableErrorResponse
 from app.api.status import response_status
+from app.application.contracts.briefing import StartupBriefing
 from app.application.contracts.classification import StartupClassification
 from app.application.contracts.evidence_validation import (
     ClaimValidation,
@@ -62,6 +63,7 @@ class SearchResponse(BaseModel):
     evidence_gaps: list[ClaimValidation]
     nvidia_contexts: list[NvidiaStartupContext]
     recommendations: list[StartupRecommendation]
+    briefings: list[StartupBriefing]
     warnings: list[str]
     errors: list[RecoverableErrorResponse]
     metrics: dict[str, float]
@@ -111,6 +113,7 @@ async def search(payload: SearchRequest, request: Request) -> JSONResponse:
         evidence_gaps=final_state.get("evidence_gaps", []),
         nvidia_contexts=final_state.get("nvidia_contexts", []),
         recommendations=final_state.get("recommendations", []),
+        briefings=final_state.get("briefings", []),
         warnings=final_state.get("warnings", []),
         errors=[RecoverableErrorResponse.from_domain(error) for error in errors],
         metrics=final_state.get("metrics", {}),
