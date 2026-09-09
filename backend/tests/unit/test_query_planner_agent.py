@@ -164,6 +164,58 @@ async def test_broad_exploratory_query_is_ready() -> None:
 
 
 @pytest.mark.asyncio
+async def test_normalizes_clarification_without_supporting_details_to_ready() -> None:
+    model = FakeChatModel(
+        response(
+            status="needs_clarification",
+            ambiguities=[],
+            clarification_questions=[],
+        )
+    )
+
+    update = await QueryPlannerAgent(model=model, config=QueryPlannerConfig())(
+        AppState(query="startups brasileiras de saúde")
+    )
+
+    assert update["query_plan"].status is QueryPlanStatus.READY
+    assert update["warnings"] == ["query_status_normalized"]
+    assert len(model.calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_completes_clarification_details_from_unresolved_filter() -> None:
+    model = FakeChatModel(
+        response(
+            status="needs_clarification",
+            ambiguities=[],
+            clarification_questions=[],
+            unresolved_filters=[{"field": "sector", "requested_value": "health"}],
+            filter_suggestions=[
+                {
+                    "field": "sector",
+                    "requested_value": "health",
+                    "options": ["vertical_saas", "data_and_ai", "accessibility"],
+                }
+            ],
+        )
+    )
+
+    update = await QueryPlannerAgent(model=model, config=QueryPlannerConfig())(
+        AppState(query="startups brasileiras de saúde")
+    )
+
+    plan = update["query_plan"]
+    assert plan.status is QueryPlanStatus.NEEDS_CLARIFICATION
+    assert "health" in plan.ambiguities[0]
+    assert "health" in plan.clarification_questions[0]
+    assert update["warnings"] == [
+        "query_status_normalized",
+        "query_plan_needs_clarification",
+    ]
+    assert len(model.calls) == 1
+
+
+@pytest.mark.asyncio
 async def test_known_alias_is_normalized_and_reported() -> None:
     model_response = response(
         filters={

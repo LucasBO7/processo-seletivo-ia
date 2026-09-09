@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
+from sqlalchemy import delete
 
 from app.application.contracts.evidence_validation import ValidatedStartupProfile
 from app.application.contracts.extraction import ExtractedFact, ExtractionSource, ProfileField
@@ -20,6 +21,7 @@ from app.graph.agents.nvidia_rag import NvidiaRagAgent
 from app.graph.state import AppState
 from app.infrastructure.persistence.database import create_engine, create_session_factory
 from app.infrastructure.persistence.knowledge import SqlAlchemyKnowledgeIngestionRepository
+from app.infrastructure.persistence.models import KnowledgeDocumentRow
 from app.infrastructure.retrieval.knowledge_bm25 import KnowledgeBM25Index
 from app.infrastructure.vector.knowledge import QdrantKnowledgeVectorStore
 from app.infrastructure.vector.qdrant import create_qdrant_client, ensure_collection
@@ -129,5 +131,9 @@ async def test_nvidia_rag_reads_postgres_and_searches_real_qdrant() -> None:
     finally:
         if await qdrant.collection_exists(qdrant_config.collection_name):
             await qdrant.delete_collection(qdrant_config.collection_name)
+        async with sessions.begin() as session:
+            await session.execute(
+                delete(KnowledgeDocumentRow).where(KnowledgeDocumentRow.id == document_id)
+            )
         await qdrant.close()
         await engine.dispose()

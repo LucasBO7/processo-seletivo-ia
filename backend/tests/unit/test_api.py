@@ -259,6 +259,7 @@ def test_search_returns_workflow_plan_candidates_and_sources(settings: Settings)
 
     assert response.status_code == 200
     body = response.json()
+    assert body["outcome"] == "success"
     assert body["query_plan"]["status"] == "ready"
     assert body["candidate_startups"][0]["startup_id"] == str(startup_id)
     assert body["selected_sources"][0]["source_id"] == str(source_id)
@@ -322,6 +323,7 @@ def test_search_returns_non_ready_plan_without_results(settings: Settings) -> No
         response = client.post("/api/v1/search", json={"query": "startups"})
 
     assert response.status_code == 200
+    assert response.json()["outcome"] == "needs_clarification"
     assert response.json()["query_plan"]["status"] == "needs_clarification"
     assert response.json()["candidate_startups"] == []
 
@@ -360,6 +362,7 @@ def test_search_exposes_unresolved_filter_suggestions(settings: Settings) -> Non
         response = client.post("/api/v1/search", json={"query": "startups de agricultura espacial"})
 
     assert response.status_code == 200
+    assert response.json()["outcome"] == "needs_clarification"
     plan = response.json()["query_plan"]
     assert plan["unresolved_filters"][0]["requested_value"] == "agricultura espacial"
     assert plan["filter_suggestions"][0]["options"] == [
@@ -370,7 +373,7 @@ def test_search_exposes_unresolved_filter_suggestions(settings: Settings) -> Non
     assert response.json()["candidate_startups"] == []
 
 
-def test_search_returns_invalid_plan_with_http_200(settings: Settings) -> None:
+def test_search_returns_invalid_plan_with_http_422(settings: Settings) -> None:
     workflow = StubWorkflow(
         AppState(
             query_plan=QueryPlan.model_validate_json(plan_response(status="invalid")),
@@ -381,7 +384,8 @@ def test_search_returns_invalid_plan_with_http_200(settings: Settings) -> None:
     with client_with_workflow(settings, workflow) as client:
         response = client.post("/api/v1/search", json={"query": "previsão do tempo"})
 
-    assert response.status_code == 200
+    assert response.status_code == 422
+    assert response.json()["outcome"] == "invalid_query"
     assert response.json()["query_plan"]["status"] == "invalid"
     assert response.json()["errors"][0]["code"] == "query_invalid"
 
@@ -401,6 +405,7 @@ def test_search_treats_empty_retrieval_as_success(settings: Settings) -> None:
         response = client.post("/api/v1/search", json={"query": "sem resultados"})
 
     assert response.status_code == 200
+    assert response.json()["outcome"] == "no_results"
     assert response.json()["candidate_startups"] == []
     assert response.json()["selected_sources"] == []
     assert response.json()["warnings"] == ["retriever_no_results"]
@@ -456,7 +461,63 @@ def test_search_maps_recoverable_errors(
         response = client.post("/api/v1/search", json={"query": "startups"})
 
     assert response.status_code == expected_status
+    expected_outcome = {
+        422: "invalid_query",
+        502: "internal_failure",
+        503: "temporarily_unavailable",
+    }[expected_status]
+    assert response.json()["outcome"] == expected_outcome
     assert response.json()["errors"] == [{"code": code, "message": "Safe failure", "node": "node"}]
+
+
+def test_search_exposes_only_finite_agent_metrics(settings: Settings) -> None:
+    workflow = StubWorkflow(
+        AppState(
+            metrics={
+                "query_planner_duration_ms": 1.0,
+                "briefing_items": 2.0,
+                "raw_prompt_tokens": 99.0,
+                "retriever_invalid": float("inf"),
+            }
+        )
+    )
+
+    with client_with_workflow(settings, workflow) as client:
+        response = client.post("/api/v1/search", json={"query": "startups"})
+
+    assert response.json()["metrics"] == {
+        "query_planner_duration_ms": 1.0,
+        "briefing_items": 2.0,
+    }
+
+
+def test_search_sanitizes_unexpected_workflow_failure(settings: Settings) -> None:
+    class FailingWorkflow(StubWorkflow):
+        async def ainvoke(self, state: AppState) -> AppState:
+            self.calls.append(state.copy())
+            raise RuntimeError("password=secret SELECT * FROM private_table traceback")
+
+    workflow = FailingWorkflow()
+    with client_with_workflow(settings, workflow) as client:
+        response = client.post(
+            "/api/v1/search",
+            json={"query": "startups"},
+            headers={"X-Correlation-ID": "failure-123"},
+        )
+
+    assert response.status_code == 500
+    assert response.headers["X-Correlation-ID"] == "failure-123"
+    assert response.json()["outcome"] == "internal_failure"
+    assert response.json()["errors"] == [
+        {
+            "code": "analysis_internal_error",
+            "message": "A análise não pôde ser concluída.",
+            "node": None,
+        }
+    ]
+    assert "secret" not in response.text
+    assert "SELECT" not in response.text
+    assert "traceback" not in response.text
 
 
 def test_error_envelope_is_sanitized(client: TestClient) -> None:
@@ -492,7 +553,9 @@ def test_openapi_exposes_current_functional_routes(client: TestClient) -> None:
     paths = schema["paths"]
     assert "/api/v1/query-plans" in paths
     assert "/api/v1/search" in paths
+    assert "/api/v1/analysis" not in paths
     search_schema = schema["components"]["schemas"]["SearchResponse"]
+    assert search_schema["properties"]["outcome"]["$ref"].endswith("/AnalysisOutcome")
     assert "recommendations" in search_schema["properties"]
     assert "briefings" in search_schema["properties"]
     assert "/health/live" not in paths
@@ -520,6 +583,22 @@ def test_openapi_exposes_current_functional_routes(client: TestClient) -> None:
     assert "NvidiaStartupContext" in schemas
     assert "NvidiaRetrievedChunk" in schemas
     assert "NvidiaContextSufficiency" in schemas
+    assert set(schemas["AnalysisOutcome"]["enum"]) == {
+        "success",
+        "needs_clarification",
+        "invalid_query",
+        "no_results",
+        "temporarily_unavailable",
+        "internal_failure",
+    }
+    operation = paths["/api/v1/search"]["post"]
+    assert operation["requestBody"]["content"]["application/json"]["schema"]["$ref"].endswith(
+        "/SearchRequest"
+    )
+    assert "examples" in operation["responses"]["200"]["content"]["application/json"]
+    assert "examples" in operation["responses"]["422"]["content"]["application/json"]
+    assert "examples" in operation["responses"]["500"]["content"]["application/json"]
+    assert "examples" in operation["responses"]["503"]["content"]["application/json"]
 
 
 @pytest.mark.parametrize("path", ["/health/live", "/health/ready"])

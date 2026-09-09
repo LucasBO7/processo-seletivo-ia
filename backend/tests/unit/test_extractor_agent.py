@@ -13,6 +13,7 @@ from app.core.config import ExtractorConfig
 from app.domain.models import SourceReference
 from app.graph.agents.extractor import ExtractorAgent, create_extractor_agent
 from app.graph.model_policy import ModelRegistry
+from app.graph.prompts.extractor import build_messages
 from app.graph.state import AppState
 from tests.fakes.providers import FakeChatModel, SequenceChatModel
 
@@ -83,6 +84,20 @@ def test_contract_rejects_extra_fields_and_unknown_fields_with_facts() -> None:
         ExtractorOutput.model_validate_json(output_for(source, unknown_fields=["product"]))
 
 
+def test_prompt_requires_exhaustive_extraction_of_explicit_technical_needs() -> None:
+    startup_id = uuid4()
+    source = source_for(
+        startup_id,
+        excerpt="The product needs to reduce inference latency.",
+    )
+
+    system_prompt, _ = build_messages(startup_name="Acme", sources=[source])
+
+    assert "every profile field" in system_prompt
+    assert "reducing latency" in system_prompt
+    assert "must not be recommendations" in system_prompt
+
+
 @pytest.mark.asyncio
 async def test_extractor_builds_traceable_profile_and_metrics() -> None:
     startup_id = uuid4()
@@ -120,6 +135,26 @@ async def test_extractor_repairs_invalid_source_reference_once() -> None:
     assert result["metrics"]["extractor_repair_count"] == 1.0
     assert len(model.calls) == 2
     assert str(source.source_id) in model.calls[1][1].content
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("as_singleton_list", [False, True])
+async def test_extractor_normalizes_redundant_output_shape(as_singleton_list: bool) -> None:
+    startup_id = uuid4()
+    source = source_for(startup_id)
+    payload = json.loads(output_for(source))
+    payload["external_dependencies"] = None
+    payload["unknown_fields"] = []
+    candidate = json.dumps([payload] if as_singleton_list else payload)
+
+    result = await ExtractorAgent(model=FakeChatModel(candidate), config=ExtractorConfig())(
+        state_for(startup_id, [source])
+    )
+
+    profile = result["structured_profiles"][0]
+    assert profile.external_dependencies == []
+    assert "external_dependencies" in profile.unknown_fields
+    assert result["errors"] == []
 
 
 @pytest.mark.asyncio

@@ -35,6 +35,13 @@ SIZE_RANGES: dict[CompanySize, TeamSizeRange] = {
     CompanySize.MEDIUM: TeamSizeRange(51, 200),
     CompanySize.LARGE: TeamSizeRange(201),
 }
+BRAZIL_COUNTRY_SCOPE = {"brasil", "brazil"}
+
+
+def normalize_locations(values: list[str]) -> tuple[str, ...]:
+    if any(normalize_taxonomy_key(value) in BRAZIL_COUNTRY_SCOPE for value in values):
+        return ()
+    return tuple(value.casefold() for value in values)
 
 
 def build_search_criteria(plan: QueryPlan) -> StartupSearchCriteria:
@@ -44,7 +51,7 @@ def build_search_criteria(plan: QueryPlan) -> StartupSearchCriteria:
     return StartupSearchCriteria(
         sectors=persisted_sector_labels(plan.filters.sectors),
         stages=persisted_stage_labels(plan.filters.stages),
-        locations=tuple(value.casefold() for value in plan.filters.locations),
+        locations=normalize_locations(plan.filters.locations),
         text_terms=tuple(value.casefold() for value in text_terms),
         team_size_ranges=ranges,
         requires_team_size_match=bool(company_sizes),

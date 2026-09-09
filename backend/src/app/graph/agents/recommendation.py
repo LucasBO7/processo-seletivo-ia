@@ -366,9 +366,7 @@ class RecommendationAgent:
             if key not in seen_evidence:
                 seen_evidence.add(key)
                 unique_evidence.append(item)
-        need_evidence_ids = {
-            source_id for need in needs for source_id in need.startup_evidence_ids
-        }
+        need_evidence_ids = {source_id for need in needs for source_id in need.startup_evidence_ids}
         unique_evidence.sort(
             key=lambda item: (
                 0
@@ -384,9 +382,7 @@ class RecommendationAgent:
             unique_evidence = unique_evidence[: self._config.max_startup_evidence]
             truncated = True
         retained_ids = {item.source_id for item in unique_evidence}
-        retained_needs = [
-            item for item in needs if retained_ids & set(item.startup_evidence_ids)
-        ]
+        retained_needs = [item for item in needs if retained_ids & set(item.startup_evidence_ids)]
         if len(retained_needs) != len(needs):
             needs = retained_needs
             truncated = True

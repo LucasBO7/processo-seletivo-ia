@@ -36,6 +36,7 @@ A execução depende de aprovação explícita desta especificação e do plano.
 - [x] **T-21 [US-09]** Testar API, OpenAPI, sucesso, ausência de aprovados e erros HTTP.
 - [x] **T-22 [US-01 a US-10, RNF-08]** Executar integração PostgreSQL real com todos os agentes falsos.
 - [x] **T-23 [US-01 a US-10, RNF-08]** Executar qualidade, cobertura e regressão do frontend.
+- [x] **T-23A [US-03, US-07, RNF-02]** Avaliar itens em lotes limitados, preservando cobertura exata e resultados parciais quando um lote persistir inválido após reparo.
 - [ ] **T-24 [US-01 a US-10]** Revisar critérios e concluir após aprovação explícita da entrega.
 
 ## Sugestão de commit

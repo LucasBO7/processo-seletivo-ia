@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import time
 from collections.abc import Iterable
@@ -12,6 +13,7 @@ from pydantic import ValidationError
 from app.application.contracts.extraction import (
     ExtractedFact,
     ExtractorOutput,
+    ProfileField,
     StructuredStartupProfile,
 )
 from app.application.ports.providers import ChatMessage, ChatModel
@@ -190,13 +192,35 @@ class ExtractorAgent:
         self, candidate: str, sources: list[SourceReference]
     ) -> ExtractorOutput | None:
         try:
-            output = ExtractorOutput.model_validate_json(candidate)
+            payload = json.loads(candidate)
+            if isinstance(payload, list) and len(payload) == 1:
+                payload = payload[0]
+            if not isinstance(payload, dict):
+                return None
+            payload = self._normalize_output_shape(payload)
+            output = ExtractorOutput.model_validate(payload)
             output = self._normalize_citations(output, sources)
             if self._exceeds_limits(output):
                 return None
             return output
-        except (ValidationError, ValueError):
+        except (json.JSONDecodeError, ValidationError, ValueError):
             return None
+
+    @staticmethod
+    def _normalize_output_shape(payload: dict[str, Any]) -> dict[str, Any]:
+        normalized = dict(payload)
+        for field in SCALAR_FIELDS:
+            if normalized.get(field) == []:
+                normalized[field] = None
+        for field in LIST_FIELDS:
+            if normalized.get(field) is None:
+                normalized[field] = []
+        normalized["unknown_fields"] = [
+            field.value
+            for field in ProfileField
+            if normalized.get(field.value) is None or normalized.get(field.value) == []
+        ]
+        return normalized
 
     def _normalize_citations(
         self, output: ExtractorOutput, sources: list[SourceReference]

@@ -109,6 +109,8 @@ def create_groq_chat_model(
     client = ChatGroq(
         model_name=config.model,
         temperature=config.temperature,
+        max_tokens=config.max_tokens,
+        model_kwargs={"response_format": {"type": "json_object"}},
         api_key=api_key,
         timeout=config.timeout_seconds,
         max_retries=config.max_retries,

@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -52,6 +53,8 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def run() -> None:
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     arguments = _parser().parse_args()
     raise SystemExit(asyncio.run(_execute(arguments)))
 

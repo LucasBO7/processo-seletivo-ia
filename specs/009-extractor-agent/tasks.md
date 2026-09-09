@@ -36,6 +36,7 @@ tarefas permanecem pendentes até sua execução e verificação.
 - [x] **T-20 [US-07]** Testar API, OpenAPI, respostas de sucesso e erros do Extractor.
 - [x] **T-21 [US-01, US-02, US-07, RNF-08]** Executar integração PostgreSQL real com Retriever e modelo falso.
 - [x] **T-22 [US-01 a US-07, RNF-08]** Executar qualidade, cobertura e regressão do frontend.
+- [x] **T-22A [US-01, US-02]** Tornar explícita no prompt a extração exaustiva de todos os campos e de necessidades documentadas como requisitos, gargalos, limitações ou metas.
 - [x] **T-23 [US-01 a US-07]** Revisar critérios e concluir somente após aprovação explícita da entrega.
 
 ## Sugestão de commit

@@ -78,3 +78,27 @@ def test_empty_document_is_rejected() -> None:
         assert str(error) == "knowledge_document_empty"
     else:
         raise AssertionError("empty document must fail")
+
+
+def test_repeated_content_is_deduplicated_with_contiguous_indexes() -> None:
+    fetched = FetchedKnowledgeContent(
+        title="NIM",
+        body="<p>Repeated block.</p><p>Repeated block.</p><p>Unique block.</p>",
+        content_type=KnowledgeContentType.HTML,
+    )
+    preparer = DeterministicKnowledgePreparer(
+        chunk_max_characters=100,
+        chunk_overlap_characters=0,
+    )
+
+    _, chunks = preparer.prepare(
+        source(),
+        fetched,
+        ingested_at=datetime(2026, 9, 7, tzinfo=UTC),
+        pipeline_version="v1",
+        embedding_fingerprint="f",
+    )
+
+    assert [item.content for item in chunks] == ["Repeated block.", "Unique block."]
+    assert [item.chunk_index for item in chunks] == [0, 1]
+    assert len({item.content_hash for item in chunks}) == len(chunks)

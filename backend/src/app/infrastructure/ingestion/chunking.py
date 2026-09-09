@@ -20,6 +20,7 @@ def chunk_document(
         raise ValueError("knowledge_chunk_config_invalid")
     pieces = _section_pieces(document.content, max_characters)
     chunks: list[PreparedKnowledgeChunk] = []
+    content_hashes: set[str] = set()
     cursor = 0
     previous_tail = ""
     for section, piece in pieces:
@@ -32,6 +33,10 @@ def chunk_document(
         end = min(len(document.content), start + len(piece))
         cursor = end
         content_hash = sha256_text(content)
+        if content_hash in content_hashes:
+            previous_tail = content[-overlap_characters:] if overlap_characters else ""
+            continue
+        content_hashes.add(content_hash)
         index = len(chunks)
         chunk_id = uuid5(
             KNOWLEDGE_NAMESPACE,

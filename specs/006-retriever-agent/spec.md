@@ -143,3 +143,9 @@ aprovada e a entrega receber aprovação explícita.
 A especificação 009 adiciona `startup_id` a cada `SourceReference`, usa essa
 associação para encaminhar fontes ao Extractor e define o aviso
 `retriever_no_sources` quando há candidatas, mas nenhuma fonte apropriada.
+
+A correção operacional registrada na spec 017 trata `Brasil` e `Brazil` como
+escopo nacional do corpus brasileiro, não como valores exatos da coluna de
+localização. Isso permite que uma startup armazenada com cidade, como `Maceió`,
+seja encontrada em uma consulta nacional. Cidades e regiões específicas continuam
+usando comparação normalizada exata conforme os critérios originais.

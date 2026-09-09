@@ -139,10 +139,12 @@ Variáveis previstas:
 | `GROQ__API_KEY` | sem default | segredo obrigatório ao compor a Groq |
 | `LLM_FAST__MODEL` | `openai/gpt-oss-20b` | string não vazia |
 | `LLM_FAST__TEMPERATURE` | `0` | entre `0` e `2` |
+| `LLM_FAST__MAX_TOKENS` | `8192` | entre `1024` e `32768` |
 | `LLM_FAST__TIMEOUT_SECONDS` | `30` | maior que `0` e até `300` |
 | `LLM_FAST__MAX_RETRIES` | `2` | entre `0` e `10` |
 | `LLM_HEAVY__MODEL` | `openai/gpt-oss-120b` | string não vazia |
 | `LLM_HEAVY__TEMPERATURE` | `0.1` | entre `0` e `2` |
+| `LLM_HEAVY__MAX_TOKENS` | `8192` | entre `1024` e `32768` |
 | `LLM_HEAVY__TIMEOUT_SECONDS` | `30` | maior que `0` e até `300` |
 | `LLM_HEAVY__MAX_RETRIES` | `2` | entre `0` e `10` |
 

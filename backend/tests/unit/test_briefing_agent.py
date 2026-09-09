@@ -395,6 +395,7 @@ async def test_markdown_is_deterministic_escaped_and_bounded() -> None:
 async def test_prompt_context_truncation_is_reported() -> None:
     state = full_state()
     profile = state["validated_profiles"][0]
+    assert profile.product is not None
     source = profile.product.sources[0]
     state["validated_profiles"] = [
         profile.model_copy(

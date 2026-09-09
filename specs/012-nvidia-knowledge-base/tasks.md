@@ -52,6 +52,8 @@ A execução depende de aprovação explícita desta especificação e do plano.
 - [x] **T-28 [US-08, RNF-08]** Isolar testes de fontes e embeddings reais sob marca `external` e habilitação explícita adicional.
 - [x] **T-29 [US-01 a US-09, RNF-09]** Executar Ruff, mypy, import-linter, suíte offline e cobertura mínima de 80%.
 - [x] **T-30 [US-01 a US-09, RNF-09]** Executar regressão de lint, testes e build do frontend.
+- [x] **T-30A [US-07, RNF-02]** Garantir que o CLI operacional selecione no Windows a política de event loop compatível com HTTP assíncrono, PostgreSQL e Qdrant.
+- [x] **T-30B [US-03, US-06]** Deduplicar blocos repetidos dentro do documento antes da persistência, preservando índices contíguos e IDs determinísticos.
 - [ ] **T-31 [US-01 a US-09]** Revisar critérios e concluir após aprovação explícita da entrega.
 
 ## Sugestão de commit

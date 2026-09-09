@@ -4,7 +4,7 @@ from app.application.contracts.extraction import ExtractorOutput
 from app.domain.models import SourceReference
 from app.graph.prompts.json_format import compact_json
 
-PROMPT_VERSION = "extractor-v1"
+PROMPT_VERSION = "extractor-v2"
 
 
 def build_messages(*, startup_name: str, sources: list[SourceReference]) -> tuple[str, str]:
@@ -26,9 +26,13 @@ def build_messages(*, startup_name: str, sources: list[SourceReference]) -> tupl
         "identifiers and URLs are metadata and do not support a fact by themselves. "
         "Every fact must cite one or more supplied sources using the exact "
         "startup_id, source_id and source_url. Never infer missing information. "
+        "Inspect every excerpt for every profile field and extract all distinct "
+        "supported facts, rather than stopping after identifying the product. "
         "Use null for missing scalar fields, [] for missing list fields, and list "
         "their names in unknown_fields. Technical needs must be explicit claims "
-        "from a document, not recommendations. Do not classify AI maturity, "
+        "from a document, including stated requirements, bottlenecks, limitations "
+        "or goals such as reducing latency; they must not be recommendations. "
+        "Do not classify AI maturity, "
         "validate claims, or recommend products or technologies. Return JSON only, "
         f"strictly matching this schema: {compact_json(schema)}"
     )

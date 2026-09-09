@@ -32,7 +32,7 @@ def test_settings_parse_nested_values() -> None:
     assert settings.query_planner.max_query_length == 2_000
     assert settings.query_planner.max_repair_attempts == 1
     assert settings.retriever.max_results == 20
-    assert settings.retriever.excerpt_length == 300
+    assert settings.retriever.excerpt_length == 1_000
     assert settings.extractor.max_sources_per_startup == 10
     assert settings.extractor.max_context_characters == 12_000
     assert settings.extractor.max_repair_attempts == 1
@@ -41,6 +41,7 @@ def test_settings_parse_nested_values() -> None:
     assert settings.startup_classifier.max_repair_attempts == 1
     assert settings.evidence_validator.max_sources_per_startup == 10
     assert settings.evidence_validator.max_items_per_startup == 250
+    assert settings.evidence_validator.max_items_per_model_call == 10
     assert settings.evidence_validator.max_repair_attempts == 1
     assert settings.knowledge_ingestion.pipeline_version == "knowledge-v1"
     assert settings.knowledge_ingestion.chunk_max_characters == 1_500
@@ -243,6 +244,7 @@ def test_query_planner_limits_reject_values_above_contract(field: str, value: in
 def test_llm_profiles_parse_environment_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LLM_FAST__MODEL", "fast-override")
     monkeypatch.setenv("LLM_FAST__TEMPERATURE", "0.25")
+    monkeypatch.setenv("LLM_FAST__MAX_TOKENS", "4096")
     monkeypatch.setenv("LLM_FAST__TIMEOUT_SECONDS", "12")
     monkeypatch.setenv("LLM_FAST__MAX_RETRIES", "1")
     monkeypatch.setenv("LLM_HEAVY__MODEL", "heavy-override")
@@ -255,6 +257,7 @@ def test_llm_profiles_parse_environment_overrides(monkeypatch: pytest.MonkeyPatc
 
     assert settings.llm_fast.model == "fast-override"
     assert settings.llm_fast.temperature == 0.25
+    assert settings.llm_fast.max_tokens == 4096
     assert settings.llm_fast.timeout_seconds == 12
     assert settings.llm_fast.max_retries == 1
     assert settings.llm_heavy.model == "heavy-override"
@@ -267,6 +270,7 @@ def test_llm_profiles_parse_environment_overrides(monkeypatch: pytest.MonkeyPatc
         ({"model": "model", "temperature": -0.1}, "temperature"),
         ({"model": "model", "temperature": 0, "timeout_seconds": 0}, "timeout"),
         ({"model": "model", "temperature": 0, "max_retries": 11}, "max_retries"),
+        ({"model": "model", "temperature": 0, "max_tokens": 512}, "max_tokens"),
     ],
 )
 def test_llm_profile_limits_are_validated(profile: dict[str, object], value: str) -> None:

@@ -37,6 +37,13 @@ class ControlledStartupRepository:
         self.calls += 1
         return [RankedStartup(startup=self.startup, score=1.0)]
 
+    async def add(self, startup: Startup) -> Startup:
+        self.startup = startup
+        return startup
+
+    async def get(self, startup_id: UUID) -> Startup | None:
+        return self.startup if self.startup.id == startup_id else None
+
 
 class ControlledStartupDocumentRepository:
     def __init__(self, document: StartupDocument) -> None:
@@ -46,6 +53,13 @@ class ControlledStartupDocumentRepository:
     async def list_for_startups(self, startup_ids: list[UUID]) -> list[StartupDocument]:
         self.calls += 1
         return [self.document] if self.document.startup_id in startup_ids else []
+
+    async def add(self, document: StartupDocument) -> StartupDocument:
+        self.document = document
+        return document
+
+    async def list_for_startup(self, startup_id: UUID) -> list[StartupDocument]:
+        return [self.document] if self.document.startup_id == startup_id else []
 
 
 class ControlledKnowledgeRepository:

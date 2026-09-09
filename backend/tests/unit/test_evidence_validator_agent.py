@@ -292,7 +292,53 @@ async def test_validator_rejects_fabricated_source() -> None:
     )
 
     assert result["errors"][0].code == "evidence_validator_invalid_output"
-    assert result["claim_validations"] == []
+    assert {item.status for item in result["claim_validations"]} == {EvidenceStatus.INSUFFICIENT}
+    assert result["validated_profiles"][0].product is None
+
+
+@pytest.mark.asyncio
+async def test_validator_batches_items_and_preserves_exact_coverage() -> None:
+    source = source_for(uuid4())
+    model = SequenceChatModel(
+        [
+            output(
+                assessment(source, "product"),
+                assessment(source, "technologies[0]"),
+            ),
+            output(assessment(source, "classification")),
+        ]
+    )
+
+    result = await EvidenceValidatorAgent(
+        model=model,
+        config=EvidenceValidatorConfig(max_items_per_model_call=2),
+    )(state_for(source))
+
+    assert len(model.calls) == 2
+    assert len(result["validated_claims"]) == 2
+    assert len(result["validated_classifications"]) == 1
+    assert result["metrics"]["evidence_validator_model_call_count"] == 2.0
+
+
+@pytest.mark.asyncio
+async def test_validator_preserves_completed_batch_when_next_batch_is_unavailable() -> None:
+    source = source_for(uuid4())
+    model = SequenceChatModel(
+        [
+            output(assessment(source, "product")),
+            ChatModelError(ChatModelErrorCode.UNAVAILABLE, "private-provider-detail"),
+        ]
+    )
+
+    result = await EvidenceValidatorAgent(
+        model=model,
+        config=EvidenceValidatorConfig(max_items_per_model_call=1),
+    )(state_for(source))
+
+    assert [item.claim_key for item in result["validated_claims"]] == ["product"]
+    assert result["evidence_gaps"][0].claim_key == "technologies[0]"
+    assert result["errors"][0].code == "evidence_validator_unavailable"
+    assert result["metrics"]["evidence_validator_model_call_count"] == 2.0
 
 
 @pytest.mark.asyncio

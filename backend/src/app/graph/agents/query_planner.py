@@ -59,7 +59,7 @@ class QueryPlannerAgent:
 
         if parsed is None:
             return self._error_update("query_plan_invalid_output", started_at, state=state)
-        plan, filters_normalized = parsed
+        plan, filters_normalized, status_normalized = parsed
         limit_error = self._validate_configured_limits(plan)
         if limit_error:
             return self._error_update("query_plan_invalid_output", started_at, state=state)
@@ -68,6 +68,8 @@ class QueryPlannerAgent:
         warnings = list(state.get("warnings", []))
         if filters_normalized:
             warnings.append("query_filter_normalized")
+        if status_normalized:
+            warnings.append("query_status_normalized")
         warnings += (
             ["query_plan_needs_clarification"]
             if plan.status is QueryPlanStatus.NEEDS_CLARIFICATION
@@ -105,19 +107,65 @@ class QueryPlannerAgent:
             return "query_too_long"
         return None
 
-    def _parse(self, candidate: str, query: str) -> tuple[QueryPlan, bool] | None:
+    def _parse(self, candidate: str, query: str) -> tuple[QueryPlan, bool, bool] | None:
         try:
             payload = json.loads(candidate)
             if not isinstance(payload, dict):
                 return None
+            payload, status_normalized = self._normalize_clarification_invariants(payload)
             plan = QueryPlan.model_validate(payload)
             filters_normalized = self._filters_were_normalized(payload, plan)
             return (
                 plan.model_copy(update={"normalized_query": normalize_text(query)}),
                 filters_normalized,
+                status_normalized,
             )
         except (json.JSONDecodeError, ValidationError):
             return None
+
+    @staticmethod
+    def _normalize_clarification_invariants(
+        payload: dict[str, Any],
+    ) -> tuple[dict[str, Any], bool]:
+        if payload.get("status") != QueryPlanStatus.NEEDS_CLARIFICATION:
+            return payload, False
+
+        ambiguities = payload.get("ambiguities") or []
+        questions = payload.get("clarification_questions") or []
+        if ambiguities and questions:
+            return payload, False
+
+        unresolved = payload.get("unresolved_filters") or []
+        normalized = dict(payload)
+        if not ambiguities and not questions and not unresolved:
+            if payload.get("filter_suggestions"):
+                return payload, False
+            normalized["status"] = QueryPlanStatus.READY
+            return normalized, True
+
+        valid_unresolved = [
+            item
+            for item in unresolved
+            if isinstance(item, dict)
+            and isinstance(item.get("field"), str)
+            and isinstance(item.get("requested_value"), str)
+            and item["requested_value"].strip()
+        ]
+        if unresolved and len(valid_unresolved) != len(unresolved):
+            return payload, False
+        if not ambiguities:
+            normalized["ambiguities"] = [
+                f'The requested {item["field"]} filter "{item["requested_value"]}" '
+                "is not in the canonical taxonomy."
+                for item in valid_unresolved[:3]
+            ]
+        if not questions:
+            normalized["clarification_questions"] = [
+                f"Which suggested {item['field']} category should represent "
+                f'"{item["requested_value"]}"?'
+                for item in valid_unresolved[:3]
+            ]
+        return normalized, True
 
     def _validate_configured_limits(self, plan: QueryPlan) -> bool:
         lists: Sequence[Sequence[Any]] = (

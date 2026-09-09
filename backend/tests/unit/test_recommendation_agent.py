@@ -377,13 +377,9 @@ async def test_representative_maturity_scenarios(
         evidence_references=[source],
     )
     response = (
-        candidate_json(source_ids, context.chunks[0].chunk_id)
-        if has_match
-        else '{"candidates":[]}'
+        candidate_json(source_ids, context.chunks[0].chunk_id) if has_match else '{"candidates":[]}'
     )
-    patch = await RecommendationAgent(
-        model=FakeChatModel(response), config=RecommendationConfig()
-    )(
+    patch = await RecommendationAgent(model=FakeChatModel(response), config=RecommendationConfig())(
         AppState(
             validated_profiles=[profile],
             validated_classifications=[classification],
@@ -481,9 +477,7 @@ async def test_startups_are_isolated_and_previous_valid_batch_survives_failure()
         )
     )
 
-    assert [item.startup_id for item in patch["recommendations"]] == [
-        first_profile.startup_id
-    ]
+    assert [item.startup_id for item in patch["recommendations"]] == [first_profile.startup_id]
     assert patch["errors"][0].code == "recommendation_unavailable"
     assert str(second_context.chunks[0].chunk_id) not in model.calls[0][1].content
     assert str(first_context.chunks[0].chunk_id) not in model.calls[1][1].content

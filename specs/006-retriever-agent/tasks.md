@@ -10,6 +10,7 @@
 - [x] **T-08 [US-01 a US-03, RNF-01 a RNF-03]** Criar migração de índices e teste de integração PostgreSQL.
 - [x] **T-09 [US-01 a US-04]** Atualizar documentação e estado compartilhado.
 - [x] **T-10 [US-01 a US-04, RNF-06]** Executar verificações completas de backend e frontend.
+- [x] **T-10A [US-02, RF-07]** Ampliar o trecho padrão para 1.000 caracteres, reduzindo perda de evidência antes da extração sem exceder o limite configurável aprovado.
 - [ ] **T-11 [US-01 a US-04]** Concluir a spec somente após aprovação explícita da entrega.
 
 ## Sugestão de commit

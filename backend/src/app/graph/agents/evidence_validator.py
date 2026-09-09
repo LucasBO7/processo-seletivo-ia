@@ -131,51 +131,66 @@ class EvidenceValidatorAgent:
                     )
                 output_by_key: dict[str, ClaimAssessmentOutput] = {}
             elif requested:
-                system_prompt, user_prompt = build_messages(
-                    items=[self._prompt_item(item) for item in requested],
-                    classification=classification,
-                    sources=bounded_sources,
-                )
-                try:
-                    model_calls += 1
-                    raw_candidate = await self._model.complete(
-                        [
-                            ChatMessage(role="system", content=system_prompt),
-                            ChatMessage(role="user", content=user_prompt),
-                        ]
+                output_by_key = {}
+                for start in range(0, len(requested), self._config.max_items_per_model_call):
+                    batch = requested[start : start + self._config.max_items_per_model_call]
+                    system_prompt, user_prompt = build_messages(
+                        items=[self._prompt_item(item) for item in batch],
+                        classification=classification,
+                        sources=bounded_sources,
                     )
-                    output = self._parse_and_validate(raw_candidate, requested, bounded_sources)
-                    attempt = 0
-                    while output is None and attempt < self._config.max_repair_attempts:
-                        attempt += 1
-                        repairs += 1
+                    try:
                         model_calls += 1
                         raw_candidate = await self._model.complete(
                             [
                                 ChatMessage(role="system", content=system_prompt),
-                                ChatMessage(
-                                    role="user",
-                                    content=build_repair_message(
-                                        raw_candidate,
-                                        claim_keys=[item.key for item in requested],
-                                        sources=bounded_sources,
-                                    ),
-                                ),
+                                ChatMessage(role="user", content=user_prompt),
                             ]
                         )
-                        output = self._parse_and_validate(raw_candidate, requested, bounded_sources)
-                except Exception:
-                    errors.append(self._error("evidence_validator_unavailable"))
-                    failures += 1
-                    provider_failed = True
-                    break
-                if output is None:
-                    errors.append(self._error("evidence_validator_invalid_output"))
-                    failures += 1
-                    continue
-                output_by_key = {
-                    assessment.claim_key: assessment for assessment in output.assessments
-                }
+                        output = self._parse_and_validate(raw_candidate, batch, bounded_sources)
+                        attempt = 0
+                        while output is None and attempt < self._config.max_repair_attempts:
+                            attempt += 1
+                            repairs += 1
+                            model_calls += 1
+                            raw_candidate = await self._model.complete(
+                                [
+                                    ChatMessage(role="system", content=system_prompt),
+                                    ChatMessage(
+                                        role="user",
+                                        content=build_repair_message(
+                                            raw_candidate,
+                                            claim_keys=[item.key for item in batch],
+                                            sources=bounded_sources,
+                                        ),
+                                    ),
+                                ]
+                            )
+                            output = self._parse_and_validate(raw_candidate, batch, bounded_sources)
+                    except Exception:
+                        errors.append(self._error("evidence_validator_unavailable"))
+                        failures += 1
+                        provider_failed = True
+                        local_assessments.update(
+                            {
+                                item.key: self._insufficient_assessment(item.key, startup_sources)
+                                for item in requested[start:]
+                            }
+                        )
+                        break
+                    if output is None:
+                        errors.append(self._error("evidence_validator_invalid_output"))
+                        failures += 1
+                        local_assessments.update(
+                            {
+                                item.key: self._insufficient_assessment(item.key, startup_sources)
+                                for item in batch
+                            }
+                        )
+                        continue
+                    output_by_key.update(
+                        {assessment.claim_key: assessment for assessment in output.assessments}
+                    )
             else:
                 output_by_key = {}
 
@@ -197,7 +212,13 @@ class EvidenceValidatorAgent:
 
             classification_assessment = classification_local
             if classification_assessment is None:
-                classification_assessment = output_by_key[CLASSIFICATION_KEY]
+                classification_assessment = output_by_key.get(
+                    CLASSIFICATION_KEY
+                ) or local_assessments.get(CLASSIFICATION_KEY)
+            if classification_assessment is None:
+                classification_assessment = self._insufficient_assessment(
+                    CLASSIFICATION_KEY, startup_sources
+                )
             classification_validation = ClassificationValidation(
                 startup_id=profile.startup_id,
                 category=classification.category if classification else None,

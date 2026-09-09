@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
+from sqlalchemy import delete
 
 from app.application.contracts.knowledge_ingestion import (
     FetchedKnowledgeContent,
@@ -18,6 +19,7 @@ from app.core.config import Settings
 from app.infrastructure.ingestion.preparer import DeterministicKnowledgePreparer
 from app.infrastructure.persistence.database import create_engine, create_session_factory
 from app.infrastructure.persistence.knowledge import SqlAlchemyKnowledgeIngestionRepository
+from app.infrastructure.persistence.models import KnowledgeDocumentRow
 from app.infrastructure.providers.embeddings import DeterministicEmbeddingModel
 from app.infrastructure.vector.knowledge import QdrantKnowledgeVectorStore
 from app.infrastructure.vector.qdrant import create_qdrant_client, ensure_collection
@@ -101,5 +103,18 @@ async def test_real_postgres_and_qdrant_ingestion_is_idempotent() -> None:
         metadata = await vector_store.list_metadata()
         assert all(metadata[item.id]["source_url"] == document.source_url for item in chunks)
     finally:
+        repository = SqlAlchemyKnowledgeIngestionRepository(sessions)
+        stored = await repository.get_by_source_key(source.source_key)
+        if stored is not None:
+            chunk_ids = {
+                item.id for item in await repository.list_chunks() if item.document_id == stored.id
+            }
+            await QdrantKnowledgeVectorStore(qdrant, settings.qdrant.collection_name).delete(
+                tuple(chunk_ids)
+            )
+            async with sessions.begin() as session:
+                await session.execute(
+                    delete(KnowledgeDocumentRow).where(KnowledgeDocumentRow.id == stored.id)
+                )
         await qdrant.close()
         await engine.dispose()

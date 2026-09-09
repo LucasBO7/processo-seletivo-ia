@@ -825,8 +825,7 @@ class BriefingAgent:
                     f"- Justificativa técnica: {technical} {markers}",
                     f"- Justificativa de negócio: {business} {markers}",
                     f"- Prioridade: {item.priority.value} {priority_markers}",
-                    f"- Complexidade: {item.implementation_complexity.value} "
-                    f"{complexity_markers}",
+                    f"- Complexidade: {item.implementation_complexity.value} {complexity_markers}",
                     f"- Ação sugerida: {self._safe(item.next_action)} {markers}",
                 )
             )

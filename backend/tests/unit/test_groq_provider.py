@@ -141,6 +141,7 @@ def test_factory_builds_configured_client_without_network(
         temperature=0.2,
         timeout_seconds=14,
         max_retries=1,
+        max_tokens=4_096,
     )
 
     model = create_groq_chat_model(
@@ -153,6 +154,8 @@ def test_factory_builds_configured_client_without_network(
     assert captured == {
         "model_name": "configured-model",
         "temperature": 0.2,
+        "max_tokens": 4_096,
+        "model_kwargs": {"response_format": {"type": "json_object"}},
         "api_key": "private-key",
         "timeout": 14,
         "max_retries": 1,

@@ -430,7 +430,7 @@ banco. Assim, `financial_services` encontra tanto `Fintech / Crédito` quanto
 `SaaS de Gestão Financeira`. Dentro de um campo os rótulos usam OR; campos
 diferentes continuam combinados com AND.
 
-O limite padrão é 20 startups e o trecho padrão possui 300 caracteres,
+O limite padrão é 20 startups e o trecho padrão possui 1.000 caracteres,
 configuráveis por `RETRIEVER__MAX_RESULTS` e `RETRIEVER__EXCERPT_LENGTH`. Busca
 sem correspondência produz listas vazias e `retriever_no_results`. Esta feature
 é executada após o Query Planner pelo LangGraph quando o plano está `ready`.
@@ -869,3 +869,24 @@ O pipeline não usa memória conversacional, checkpointer, autenticação, scrap
 intervenção humana ou um segundo grafo. A topologia, os roteamentos e o fluxo com
 os oito agentes reais são cobertos por testes com provedores falsos e
 infraestrutura controlada.
+
+## 13. API de análise
+
+`POST /api/v1/search` é a única rota que executa a análise multiagente completa.
+Ela recebe `{"query":"..."}` e devolve um contrato estruturado com plano, startups,
+fontes, perfis, classificações, evidências validadas, contexto NVIDIA,
+recomendações, briefings, avisos, erros sanitizados e métricas públicas. O campo
+`outcome` distingue `success`, `needs_clarification`, `invalid_query`, `no_results`,
+`temporarily_unavailable` e `internal_failure`.
+
+Resultados que precisam de esclarecimento ou não encontram startups usam HTTP
+200; consultas inválidas usam 422; falhas de dependência/modelo usam 502;
+indisponibilidade temporária usa 503; e exceções inesperadas são reduzidas a uma
+resposta 500 estável, sem prompts, respostas brutas, SQL, stack traces ou
+credenciais. Os exemplos de todos os cenários estão publicados em
+`/api/v1/docs` e `/api/v1/openapi.json`.
+
+Não existe uma rota `/api/v1/analysis`, pois ela duplicaria a responsabilidade de
+`/api/v1/search`. A rota `/api/v1/query-plans` continua separada por executar
+somente o planejamento. CORS, correlação por `X-Correlation-ID` e os recursos
+compostos uma vez no lifespan permanecem inalterados.

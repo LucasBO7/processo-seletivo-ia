@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict
+from typing import Any, cast
 from uuid import UUID, uuid4
 
 import pytest
@@ -174,11 +175,14 @@ def test_route_after_nvidia_rag_requires_matching_sufficient_citable_context() -
 
 
 def test_route_after_recommendation_requires_a_valid_recommendation() -> None:
-    recommendation = StartupRecommendation.model_construct(startup_id=uuid4())
+    recommendation = StartupRecommendation.model_construct(**cast(Any, {"startup_id": uuid4()}))
 
     assert route_after_recommendation(AppState(recommendations=[recommendation])) == "brief"
     assert route_after_recommendation(AppState(recommendations=[])) == "stop"
-    assert route_after_recommendation(AppState(recommendations=[{"invalid": True}])) == "stop"
+    assert (
+        route_after_recommendation(AppState(recommendations=cast(Any, [{"invalid": True}])))
+        == "stop"
+    )
 
 
 def _usable_profile_for_recommendation() -> tuple[ValidatedStartupProfile, list[UUID]]:
@@ -260,11 +264,11 @@ def test_route_after_query_planner(state: AppState, expected: str) -> None:
 
 
 def test_routes_reject_malformed_truthy_values_without_raising() -> None:
-    assert route_after_query_planner(AppState(query_plan={"status": "ready"})) == "stop"
+    assert route_after_query_planner(AppState(query_plan=cast(Any, {"status": "ready"}))) == "stop"
     assert (
         route_after_retriever(
             AppState(
-                candidate_startups=[{"startup_id": "not-a-uuid", "name": "Acme"}],
+                candidate_startups=cast(Any, [{"startup_id": "not-a-uuid", "name": "Acme"}]),
                 selected_sources=[],
             )
         )
@@ -323,7 +327,10 @@ def test_route_after_extractor_requires_profile() -> None:
     assert route_after_extractor(AppState(structured_profiles=[profile])) == "classify"
     assert route_after_extractor(AppState(structured_profiles=[])) == "stop"
     assert route_after_extractor(AppState()) == "stop"
-    assert route_after_extractor(AppState(structured_profiles=[{"invalid": True}])) == "stop"
+    assert (
+        route_after_extractor(AppState(structured_profiles=cast(Any, [{"invalid": True}])))
+        == "stop"
+    )
 
 
 def test_route_after_classifier_requires_profile_not_classification() -> None:
@@ -380,7 +387,9 @@ def test_recoverable_errors_keep_valid_partial_outputs_routable() -> None:
     )
     candidate = CandidateStartup(startup_id=profile.startup_id, name=profile.name, score=1.0)
     error = RecoverableError("stage_unavailable", "Safe failure")
-    recommendation = StartupRecommendation.model_construct(startup_id=profile.startup_id)
+    recommendation = StartupRecommendation.model_construct(
+        **cast(Any, {"startup_id": profile.startup_id})
+    )
 
     assert (
         route_after_retriever(
@@ -438,7 +447,9 @@ async def test_workflow_interrupts_before_node_without_preconditions(
         title="Evidence",
         excerpt="Inference API",
     )
-    recommendation = StartupRecommendation.model_construct(startup_id=profile.startup_id)
+    recommendation = StartupRecommendation.model_construct(
+        **cast(Any, {"startup_id": profile.startup_id})
+    )
     nodes = {
         "query_planner": RecordingNode(AppState(query_plan=query_plan())),
         "retriever": RecordingNode(
@@ -642,7 +653,9 @@ async def test_workflow_runs_recommendation_after_sufficient_nvidia_context() ->
         title="Evidence",
         excerpt="Inference API",
     )
-    generated_recommendation = StartupRecommendation.model_construct(startup_id=profile.startup_id)
+    generated_recommendation = StartupRecommendation.model_construct(
+        **cast(Any, {"startup_id": profile.startup_id})
+    )
     recommendation = RecordingNode(AppState(recommendations=[generated_recommendation]))
     briefing = RecordingNode(AppState())
     workflow = compile_analysis_workflow(

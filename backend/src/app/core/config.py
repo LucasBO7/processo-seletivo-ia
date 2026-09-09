@@ -73,6 +73,7 @@ class LLMProfileConfig(BaseModel):
 
     model: str = Field(min_length=1)
     temperature: float = Field(ge=0, le=2)
+    max_tokens: int = Field(default=8_192, ge=1_024, le=32_768)
     timeout_seconds: float = Field(default=30.0, gt=0, le=300)
     max_retries: int = Field(default=2, ge=0, le=10)
 
@@ -91,7 +92,7 @@ class RetrieverConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     max_results: int = Field(default=20, ge=1, le=100)
-    excerpt_length: int = Field(default=300, ge=50, le=2_000)
+    excerpt_length: int = Field(default=1_000, ge=50, le=2_000)
 
 
 class ExtractorConfig(BaseModel):
@@ -120,9 +121,16 @@ class EvidenceValidatorConfig(BaseModel):
 
     max_sources_per_startup: int = Field(default=10, ge=1, le=50)
     max_items_per_startup: int = Field(default=250, ge=1, le=500)
+    max_items_per_model_call: int = Field(default=10, ge=1, le=50)
     max_context_characters: int = Field(default=20_000, ge=100, le=200_000)
     max_justification_length: int = Field(default=1_000, ge=50, le=4_000)
     max_repair_attempts: int = Field(default=1, ge=0, le=1)
+
+    @model_validator(mode="after")
+    def validate_item_batch_limit(self) -> Self:
+        if self.max_items_per_model_call > self.max_items_per_startup:
+            raise ValueError("validation batch must not exceed startup item limit")
+        return self
 
 
 class KnowledgeIngestionConfig(BaseModel):

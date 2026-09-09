@@ -10,7 +10,12 @@ from app.application.contracts.query_plan import QueryPlan
 from app.application.contracts.retrieval import RankedStartup, StartupSearchCriteria, TeamSizeRange
 from app.core.config import RetrieverConfig
 from app.domain.models import RecoverableError, Startup, StartupDocument
-from app.graph.agents.retriever import RetrieverAgent, build_search_criteria, parse_team_size
+from app.graph.agents.retriever import (
+    RetrieverAgent,
+    build_search_criteria,
+    normalize_locations,
+    parse_team_size,
+)
 from app.graph.contracts import GraphNode
 from app.graph.state import AppState
 
@@ -130,6 +135,16 @@ def test_builds_normalized_search_criteria_from_query_plan() -> None:
     assert criteria.text_terms == ("crédito", "machine learning")
     assert criteria.team_size_ranges == (TeamSizeRange(11, 50), TeamSizeRange(20, 30))
     assert criteria.structured_filter_count == 4
+
+
+@pytest.mark.parametrize("country", ["Brasil", "Brazil", "BRAZIL"])
+def test_treats_brazil_as_country_scope_instead_of_exact_city(country: str) -> None:
+    assert normalize_locations([country]) == ()
+    assert normalize_locations([country, "São Paulo"]) == ()
+
+
+def test_preserves_specific_city_location_filter() -> None:
+    assert normalize_locations(["São Paulo"]) == ("são paulo",)
 
 
 @pytest.mark.asyncio
