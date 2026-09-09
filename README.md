@@ -4,9 +4,9 @@ Plataforma idealizada para apoiar a NVIDIA na identificação, qualificação e 
 
 Desenvolvido por Lucas Bianchezzi Oliveira ([@LucasBO7](https://github.com/LucasBO7)).
 
-> Estado atual: o backend executa Query Planner → Retriever → Extractor →
-> Classifier → Evidence Validator → NVIDIA RAG pelo LangGraph e expõe o
-> resultado para integração com o frontend. Recomendação e briefing continuam pendentes.
+> Estado atual: o backend executa os oito agentes, do Query Planner ao Briefing,
+> e o frontend permite consultar a pipeline, explorar os resultados por startup
+> e exportar o briefing Markdown.
 
 ## 1. Contexto
 
@@ -286,6 +286,16 @@ npm run test:watch # executa os testes em modo interativo
 npm run build      # valida tipos e gera a versão de produção
 npm run preview    # serve localmente o build de produção
 ```
+
+O frontend consome `POST http://127.0.0.1:8000/api/v1/search` por padrão. Para
+usar outro endereço público da API, copie `.env.example` para `.env.local` e
+altere `VITE_API_BASE_URL`. Variáveis `VITE_*` são incorporadas ao bundle e,
+portanto, nunca devem conter chaves, tokens ou outras credenciais.
+
+Para operar a interface completa, mantenha a API e o Vite ativos em terminais
+separados. O frontend apresenta consulta em linguagem natural, filtros canônicos,
+os seis desfechos da análise, resultados isolados por startup, fontes acessíveis e
+download do campo Markdown produzido pelo Briefing Agent.
 
 ### 7.2. Backend
 

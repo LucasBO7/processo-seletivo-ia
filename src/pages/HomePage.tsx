@@ -1,61 +1,62 @@
-import { ProjectScope } from '../components/ProjectScope'
+import { useState } from 'react'
 
-const currentScope = [
-  'Documentação orientada por especificações',
-  'Diagramas do problema e do pipeline',
-  'Fundação do frontend React',
-]
-
-const futureScope = [
-  'Arquitetura do backend',
-  'Orquestração multiagente',
-  'Persistência e recuperação de conhecimento',
-]
+import { AnalysisClientError, analyzeStartups } from '../api/analysis-client'
+import type { SearchResponse } from '../api/analysis-types'
+import { AnalysisState, LoadingState } from '../components/AnalysisState'
+import { SearchForm } from '../components/SearchForm'
+import { StartupDetails } from '../components/StartupDetails'
+import { StartupList } from '../components/StartupList'
 
 export function HomePage() {
+  const [query, setQuery] = useState('')
+  const [response, setResponse] = useState<SearchResponse | null>(null)
+  const [selectedId, setSelectedId] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [networkError, setNetworkError] = useState('')
+
+  async function submit(composedQuery: string) {
+    setLoading(true)
+    setNetworkError('')
+    setResponse(null)
+    setSelectedId('')
+    try {
+      const result = await analyzeStartups(composedQuery)
+      setResponse(result)
+      setSelectedId(result.candidate_startups[0]?.startup_id ?? '')
+    } catch (error) {
+      setNetworkError(error instanceof AnalysisClientError ? error.message : 'Não foi possível concluir a análise.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function useQuestion(question: string) {
+    setQuery((current) => `${current.trim()}\n${question}`.trim())
+    document.querySelector<HTMLTextAreaElement>('#startup-query')?.focus()
+  }
+
   return (
-    <main>
-      <section className="hero">
-        <div className="hero__glow" aria-hidden="true" />
-        <nav className="hero__nav" aria-label="Identificação do projeto">
+    <main className="app-shell">
+      <header className="topbar">
+        <nav className="topbar__content" aria-label="Identificação do projeto">
           <span className="brand-mark" aria-hidden="true">
             IA
           </span>
-          <span>Inteli Academy</span>
-          <span className="status-pill">Fundação</span>
+          <div><strong>NVIDIA Startup AI Radar</strong><span>Inteligência de ecossistema</span></div>
+          <span className="status-pill"><i aria-hidden="true" /> API integrada</span>
         </nav>
+      </header>
 
-        <div className="hero__content">
-          <p className="hero__eyebrow">NVIDIA STARTUP AI RADAR</p>
-          <h1>Inteligência para encontrar a próxima startup AI-native.</h1>
-          <p className="hero__summary">
-            Uma plataforma em formação para analisar evidências, diagnosticar
-            maturidade técnica e orientar recomendações da stack NVIDIA.
-          </p>
-          <a className="hero__link" href="/README.md">
-            Conhecer a especificação <span aria-hidden="true">→</span>
-          </a>
-        </div>
-      </section>
-
-      <section className="scope" aria-labelledby="scope-title">
-        <div className="section-heading">
-          <p>Escopo controlado</p>
-          <h2 id="scope-title">Uma fundação clara antes da arquitetura.</h2>
-        </div>
-
-        <div className="scope-grid">
-          <ProjectScope
-            title="Incluído nesta entrega"
-            items={currentScope}
-            tone="current"
-          />
-          <ProjectScope
-            title="Reservado para depois"
-            items={futureScope}
-            tone="future"
-          />
-        </div>
+      <section className="workspace">
+        <SearchForm query={query} loading={loading} onQueryChange={setQuery} onSubmit={submit} />
+        {loading && <LoadingState />}
+        {!loading && <AnalysisState response={response} networkError={networkError} onUseQuestion={useQuestion} />}
+        {!loading && response && response.candidate_startups.length > 0 && (
+          <div className="results-layout">
+            <StartupList startups={response.candidate_startups} selectedId={selectedId} onSelect={setSelectedId} />
+            <StartupDetails response={response} startupId={selectedId} />
+          </div>
+        )}
       </section>
     </main>
   )
