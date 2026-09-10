@@ -1,0 +1,68 @@
+{
+  "version": "v1",
+  "cases": [
+    {
+      "id": "hand-talk-accessibility",
+      "origin": "real_snapshot",
+      "reviewed_at": "2026-09-09",
+      "reference_urls": ["https://www.handtalk.me/br/"],
+      "query": "Analise a Hand Talk como startup de acessibilidade e uso de inteligência artificial.",
+      "expected": {
+        "plan": {"status": "ready", "filters": {"sectors": ["accessibility"], "keywords": ["Hand Talk"]}},
+        "relevant_startups": ["Hand Talk"],
+        "profile": {
+          "required_facts": {"product": ["tradução"], "ai_use_cases": ["Libras"]},
+          "forbidden_facts": ["diagnóstico médico", "robótica industrial"]
+        },
+        "classification": "ai-native",
+        "evidence_statuses": {"product:0": "supported", "ai_use_cases:0": "supported"},
+        "relevant_nvidia_sources": ["riva", "nvidia-nim"],
+        "citation_urls": ["https://www.handtalk.me/br/", "https://developer.nvidia.com/riva"],
+        "acceptable_technologies": ["riva", "nvidia_nim", "nvidia_inception"],
+        "forbidden_recommendations": ["isaac", "clara"]
+      }
+    },
+    {
+      "id": "vision-health-inference",
+      "origin": "synthetic",
+      "reviewed_at": "2026-09-09",
+      "reference_urls": ["https://www.nvidia.com/en-us/clara/"],
+      "query": "Encontre uma startup seed de saúde cujo produto principal use inferência de IA.",
+      "expected": {
+        "plan": {"status": "ready", "filters": {"sectors": ["data_and_ai"], "stages": ["seed"], "keywords": ["saúde", "inferência"]}},
+        "relevant_startups": ["Vision Health"],
+        "profile": {
+          "required_facts": {"product": ["triagem clínica"], "technical_needs": ["inferência"]},
+          "forbidden_facts": ["aprovação regulatória garantida", "substitui médicos"]
+        },
+        "classification": "ai-native",
+        "evidence_statuses": {"product:0": "supported", "technical_needs:0": "supported"},
+        "relevant_nvidia_sources": ["clara", "triton-overview", "nvidia-nim"],
+        "citation_urls": ["https://vision-health.example.test/product", "https://www.nvidia.com/en-us/clara/"],
+        "acceptable_technologies": ["clara", "triton_inference_server", "nvidia_nim"],
+        "forbidden_recommendations": ["omniverse", "isaac"]
+      }
+    },
+    {
+      "id": "finops-analytics-acceleration",
+      "origin": "synthetic",
+      "reviewed_at": "2026-09-09",
+      "reference_urls": ["https://rapids.ai/"],
+      "query": "Analise startups financeiras que processam grandes volumes tabulares para detectar anomalias.",
+      "expected": {
+        "plan": {"status": "ready", "filters": {"sectors": ["financial_services"], "keywords": ["dados tabulares", "anomalias"]}},
+        "relevant_startups": ["FinOps Analytics"],
+        "profile": {
+          "required_facts": {"product": ["detecção de anomalias"], "technical_needs": ["processamento tabular"]},
+          "forbidden_facts": ["reconhecimento de voz", "simulação robótica"]
+        },
+        "classification": "ai-enabled",
+        "evidence_statuses": {"product:0": "supported", "technical_needs:0": "supported"},
+        "relevant_nvidia_sources": ["rapids", "cudf", "cuml"],
+        "citation_urls": ["https://finops.example.test/platform", "https://rapids.ai/"],
+        "acceptable_technologies": ["rapids", "cudf", "cuml"],
+        "forbidden_recommendations": ["riva", "isaac"]
+      }
+    }
+  ]
+}

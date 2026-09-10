@@ -172,25 +172,33 @@ A versão visual original está em [documents/mvp-pipeline-diagram.jpg](document
 
 ## 4. Escopo atual
 
-Esta fundação inclui:
+O MVP implementado inclui:
 
-- especificações SDD do estágio atual;
-- frontend React com TypeScript e Vite;
-- uma página inicial que comunica o estado e os limites do projeto;
-- backend Python 3.12 com FastAPI, contratos LangGraph e arquitetura modular;
-- PostgreSQL 16, migrações Alembic, Qdrant e fronteira BM25;
-- API versionada do Query Planner, correlação, CORS e logs JSON;
-- Query Planner assíncrono com saída estruturada, validação e reparo limitado;
-- testes unitários, arquiteturais e de integração, qualidade estática e CI;
-- documentação das decisões técnicas e operacionais.
+- frontend React, TypeScript e Vite para consulta, exploração por startup e
+  exportação do briefing em Markdown;
+- backend Python 3.12 com FastAPI e um único workflow LangGraph assíncrono;
+- os oito agentes do pipeline, com contratos tipados e interrupções condicionais;
+- `POST /api/v1/search` para a análise completa e
+  `POST /api/v1/query-plans` para o planejamento isolado;
+- PostgreSQL 16 como fonte de verdade, Qdrant para busca vetorial e BM25 para
+  busca lexical;
+- ingestão e verificação da base oficial NVIDIA, recuperação híbrida e
+  reranking opcional;
+- integrações com Groq, embeddings OpenAI-compatible e Cohere por portas
+  internas desacopladas;
+- benchmark de qualidade reproduzível, testes unitários, arquiteturais e de
+  integração, qualidade estática e CI;
+- especificações SDD e documentação das decisões técnicas e operacionais.
 
-Não estão incluídos neste estágio:
+Permanecem fora do escopo:
 
-- lógica ou prompts dos agentes LangGraph/LangChain;
-- grafo funcional compilado ou rota de análise;
-- ingestão de conteúdo, embeddings ou chamadas reais a provedores de IA;
-- autenticação, implantação ou Dockerfile da API;
-- scraping ou ingestão automática de fontes externas.
+- autenticação, autorização e implantação da API;
+- memória conversacional, checkpoint, retomada e intervenção humana;
+- streaming ou progresso individual dos agentes em tempo real;
+- persistência e histórico dos resultados da análise;
+- scraping de startups ou ingestão irrestrita da web; a ingestão existente é
+  limitada ao manifesto de fontes oficiais NVIDIA;
+- treinamento de modelos, alteração automática de prompts e avaliação paga no CI.
 
 ## 5. Organização do repositório
 
@@ -198,20 +206,22 @@ Não estão incluídos neste estágio:
 
 ```text
 .
-├── .vscode/                       # Configurações do ambiente de desenvolvimento
-├── documents/                     # TAPI, diagramas e decisões arquiteturais
-├── specs/
-│   ├── 001-project-foundation/ # Fundação do frontend, aprovada e implementada
-│   └── 002-backend-foundation/ # Fundação do backend implementada
+├── .github/                    # CI do frontend, backend e integrações
+├── documents/                  # TAPI, diagramas e decisões arquiteturais
+├── specs/                      # Specs 001–019, planos e tarefas rastreáveis
 ├── backend/
-│   ├── migrations/             # Schema PostgreSQL versionado
-│   ├── src/app/                # API, aplicação, domínio, grafo e infraestrutura
-│   └── tests/                  # Testes unitários, arquiteturais e de integração
-├── src/                           # Frontend React existente
-│   ├── components/
-│   ├── pages/
-│   ├── styles/
-│   └── test/
+│   ├── evaluation/          # Dataset, predições, thresholds e relatórios
+│   ├── migrations/          # Schema PostgreSQL versionado
+│   ├── scripts/             # Manifesto e operação da base NVIDIA
+│   ├── src/app/             # Monólito modular do backend
+│   └── tests/               # Testes unitários, arquiteturais e de integração
+├── src/                        # SPA React
+│   ├── api/                 # Cliente e contratos da API de análise
+│   ├── components/          # Formulário, estados, lista e detalhes
+│   ├── pages/               # Composição da página
+│   ├── styles/              # Estilos globais e responsivos
+│   └── test/                # Configuração dos testes do frontend
+├── compose.yaml                # PostgreSQL e Qdrant locais opcionais
 ├── index.html
 ├── package.json
 └── vite.config.ts
@@ -219,37 +229,89 @@ Não estão incluídos neste estágio:
 
 ### 5.2. Arquitetura do backend
 
-A especificação 002 implementa um monólito modular. A organização abaixo
-preserva os oito agentes do pipeline e separa regras de negócio, orquestração e
-integrações externas:
+A aplicação é um monólito modular. Domínio e aplicação não dependem de
+FastAPI, SQLAlchemy, Qdrant ou SDKs de provedores; contratos automatizados do
+Import Linter verificam esses limites. A camada `graph` orquestra os casos de uso,
+enquanto `api` e `infrastructure` adaptam entradas e serviços externos.
 
 ```text
 backend/
-├── pyproject.toml, uv.lock          # Projeto Python reproduzível
-├── migrations/                    # Schema PostgreSQL versionado
-├── scripts/                       # Orientação para operações futuras
+├── evaluation/                  # Artefatos versionados do benchmark
+├── migrations/                  # Migrações Alembic
+├── scripts/                     # Fontes e comandos da base NVIDIA
 ├── src/app/
-│   ├── api/                      # FastAPI, health, middleware e erros
-│   ├── application/              # Casos de uso e portas internas
-│   ├── domain/                   # Entidades, evidências e recomendações
+│   ├── api/                     # FastAPI, rotas, middleware e erros HTTP
+│   ├── application/
+│   │   ├── contracts/           # DTOs validados entre agentes e API
+│   │   ├── ports/               # Interfaces de repositórios e provedores
+│   │   └── services/            # Casos de uso da base de conhecimento
+│   ├── domain/                  # Modelos independentes de frameworks
 │   ├── graph/
-│   │   ├── state.py              # Estado compartilhado do LangGraph
-│   │   ├── nodes.py              # Identificadores dos oito agentes
-│   │   ├── contracts.py          # Contrato uniforme dos nós
-│   │   ├── builder.py            # Montagem do grafo
-│   ├── infrastructure/          # PostgreSQL, Qdrant, BM25 e provedores
-│   ├── core/                    # Configuração, logging e ciclo de vida
-│   └── main.py                  # Composição e entrada da API
-└── tests/                         # Testes unitários, de integração e arquitetura
+│   │   ├── agents/              # Implementação dos oito agentes
+│   │   ├── prompts/             # Prompts e formato JSON compartilhado
+│   │   ├── state.py             # AppState rastreável da execução
+│   │   └── builder.py           # Topologia e roteamento condicional
+│   ├── infrastructure/
+│   │   ├── ingestion/           # Coleta, normalização e chunking NVIDIA
+│   │   ├── persistence/         # PostgreSQL e repositórios SQLAlchemy
+│   │   ├── providers/           # Groq, embeddings e Cohere
+│   │   ├── retrieval/           # Índices BM25
+│   │   └── vector/              # Busca e readiness do Qdrant
+│   ├── evaluation/              # Scoring, relatórios e adaptador opcional da API
+│   ├── cli/                     # Operação da base NVIDIA
+│   ├── core/                    # Configuração, logging e recursos do lifespan
+│   └── main.py                  # Entry point compatível com Windows
+└── tests/                        # Testes offline e integrações opcionais
 ```
 
-O `query_planner` e o `retriever` ficam em `graph/agents`; os futuros `extractor`,
-`classifier`, `validator`, `nvidia_rag`, `recommender` e `briefing` serão
-adicionados por suas próprias especificações.
-As antigas `db_tools` e `rag_tools` são divididas entre contratos de
-`application` e adaptadores de `infrastructure`, evitando que os agentes dependam
-diretamente de SQL ou SDKs. A estrutura detalhada e os limites desta primeira
-entrega estão no [plano da fundação do backend](specs/002-backend-foundation/plan.md).
+### 5.3. Fluxo em tempo de execução
+
+```mermaid
+flowchart LR
+    UI[SPA React] -->|POST /api/v1/search| API[FastAPI]
+    API -->|empty_state + ainvoke| GRAPH[Único StateGraph]
+    GRAPH --> AGENTS[Oito agentes com<br/>roteamento condicional]
+
+    AGENTS --> PORTS[Portas da aplicação]
+    PORTS --> PG[(PostgreSQL)]
+    PORTS --> QD[(Qdrant)]
+    PORTS --> BM25[Índice BM25]
+    PORTS --> GROQ[Groq<br/>llm_fast / llm_heavy]
+    PORTS --> EMB[Embeddings<br/>OpenAI-compatible]
+    PORTS --> COHERE[Cohere reranker]
+
+    AGENTS --> STATE[AppState com IDs,<br/>fontes, avisos e métricas]
+    STATE --> API
+    API --> UI
+
+    EVAL[CLI de avaliação] -.->|offline: predições versionadas| REPORTS[Relatórios MD / JSON]
+    EVAL -.->|live opt-in: API pública| API
+
+    classDef boundary fill:#eef2ff,stroke:#4f46e5,color:#111827;
+    classDef core fill:#ecfdf5,stroke:#059669,color:#111827;
+    classDef external fill:#fff7ed,stroke:#ea580c,color:#111827;
+    class UI,API,EVAL boundary;
+    class GRAPH,AGENTS,PORTS,STATE core;
+    class PG,QD,BM25,GROQ,EMB,COHERE,REPORTS external;
+```
+
+O composition root de `api/app.py` cria modelos, clientes, repositórios, agentes e
+o workflow uma vez por lifespan. Cada chamada a `/api/v1/search` cria apenas um
+`AppState` independente; o grafo preserva IDs, URLs, citações, avisos, erros
+recuperáveis e métricas. As sete transições condicionais encerram cedo quando a
+próxima etapa não possui entrada válida, sem descartar resultados válidos de
+outras startups.
+
+O PostgreSQL é a fonte de verdade para startups, documentos e conteúdo NVIDIA.
+Na recuperação NVIDIA, Qdrant e BM25 são combinados por weighted RRF; embeddings,
+busca vetorial e reranking possuem degradação controlada. O benchmark fica fora
+do caminho das requisições: por padrão ele compara artefatos versionados e, com
+opt-in explícito, consome somente o contrato público da API.
+
+As decisões de base estão no
+[plano da fundação do backend](specs/002-backend-foundation/plan.md), e a topologia
+atual está consolidada no
+[plano da orquestração completa](specs/016-full-pipeline-orchestration/plan.md).
 
 ## 6. Pré-requisitos
 
@@ -391,7 +453,7 @@ automaticamente. Uma consulta realmente ampla continua `ready` sem filtros.
 
 Os status possíveis são:
 
-- `ready`: plano consumível por um futuro Retriever;
+- `ready`: plano consumível pelo Retriever;
 - `needs_clarification`: há ambiguidade material e perguntas curtas para resolvê-la;
 - `invalid`: a solicitação não pertence à descoberta ou análise de startups.
 
@@ -549,6 +611,30 @@ fallbacks documentados. O resultado aparece em `nvidia_contexts` na resposta de
 
 ### 7.11. Qualidade e testes do backend
 
+O benchmark reproduzível da spec 019 avalia separadamente planejamento, recuperação
+de startups, extração, classificação, suporte factual, recuperação NVIDIA, efeito do
+reranking, citações e recomendações. A execução padrão usa somente casos e predições
+versionados, sem rede ou provedores pagos:
+
+```powershell
+uv run --project backend startup-radar-evaluate
+```
+
+Os relatórios Markdown e JSON são escritos em `backend/evaluation/reports/`. Limites
+estão em `backend/evaluation/thresholds.v1.json` e a avaliação humana opcional segue
+`backend/evaluation/RUBRIC.md`.
+
+Para avaliar uma API em execução com Groq, embeddings e reranker configurados, o
+opt-in é deliberadamente duplo. A saída persiste apenas métricas agregadas e IDs:
+
+```powershell
+$env:RUN_LIVE_EVALUATION = "1"
+uv run --project backend startup-radar-evaluate --live-api http://127.0.0.1:8000 --run-id live-local
+```
+
+Nunca passe chaves na linha de comando. O backend continua responsável por ler suas
+credenciais do ambiente local.
+
 Execute cada verificação separadamente:
 
 ```bash
@@ -607,7 +693,7 @@ Cada mudança deve responder, nesta ordem, a três perguntas:
 2. **Como será construído?** — `plan.md`.
 3. **Em quais passos verificáveis?** — `tasks.md`.
 
-A fundação mais recente em [specs/002-backend-foundation](specs/002-backend-foundation/) funciona como exemplo completo.
+A fundação do backend em [specs/002-backend-foundation](specs/002-backend-foundation/) funciona como exemplo completo.
 
 ### 8.1. Criar uma especificação
 
@@ -822,11 +908,12 @@ Especificação Concluída
 
 As alternativas retiradas do escopo desta fundação estão registradas em [documents/decisoes-tecnicas-removidas.md](documents/decisoes-tecnicas-removidas.md).
 
-## 9. Próxima etapa
+## 9. Evolução da arquitetura
 
-As próximas capacidades e a integração visual com o frontend continuam exigindo
-especificações próprias. Cada nova etapa deve reutilizar as portas e os modelos da
-fundação sem acoplar domínio a FastAPI, SQLAlchemy, Qdrant ou SDKs externos.
+Novas capacidades devem evoluir o workflow, os contratos e a interface existentes
+por meio de especificações próprias. A evolução deve preservar o grafo único, o
+estado rastreável, as portas da aplicação e a independência do domínio em relação
+a FastAPI, SQLAlchemy, Qdrant e SDKs externos.
 
 ## 10. Recommendation Agent
 

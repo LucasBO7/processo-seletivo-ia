@@ -1,0 +1,22 @@
+{
+  "version": "v1",
+  "metrics": {
+    "query_structure": 0.85,
+    "startup_recall_at_5": 0.8,
+    "startup_precision_at_5": 0.6,
+    "startup_mrr": 0.75,
+    "extraction_fact_recall": 0.85,
+    "forbidden_fact_avoidance": 1.0,
+    "classification_accuracy": 0.9,
+    "factual_support_accuracy": 0.9,
+    "nvidia_recall_at_5": 0.8,
+    "nvidia_precision_at_5": 0.6,
+    "reranking_after_mrr": 0.8,
+    "reranking_delta_mrr": 0.0,
+    "citation_url_validity": 0.95,
+    "citation_recall": 0.9,
+    "recommendation_acceptance": 0.8,
+    "forbidden_recommendation_avoidance": 1.0,
+    "subjective_rubric": 0.75
+  }
+}

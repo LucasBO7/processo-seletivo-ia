@@ -25,6 +25,7 @@ dependencies = [
 startup-radar = "app.main:run"
 startup-radar-check = "app.scripts:check"
 startup-radar-knowledge = "app.cli.knowledge:run"
+startup-radar-evaluate = "app.evaluation.cli:run"
 
 [build-system]
 requires = ["uv_build>=0.11,<0.13"]

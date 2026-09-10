@@ -1,0 +1,133 @@
+{
+  "dataset_version": "v1",
+  "prediction_version": "v1",
+  "run_id": "reference-v1",
+  "mode": "offline",
+  "passed": true,
+  "metrics": [
+    {
+      "name": "query_structure",
+      "value": 1.0,
+      "threshold": 0.85,
+      "passed": true,
+      "failed_cases": []
+    },
+    {
+      "name": "startup_recall_at_5",
+      "value": 1.0,
+      "threshold": 0.8,
+      "passed": true,
+      "failed_cases": []
+    },
+    {
+      "name": "startup_precision_at_5",
+      "value": 1.0,
+      "threshold": 0.6,
+      "passed": true,
+      "failed_cases": []
+    },
+    {
+      "name": "startup_mrr",
+      "value": 1.0,
+      "threshold": 0.75,
+      "passed": true,
+      "failed_cases": []
+    },
+    {
+      "name": "extraction_fact_recall",
+      "value": 1.0,
+      "threshold": 0.85,
+      "passed": true,
+      "failed_cases": []
+    },
+    {
+      "name": "forbidden_fact_avoidance",
+      "value": 1.0,
+      "threshold": 1.0,
+      "passed": true,
+      "failed_cases": []
+    },
+    {
+      "name": "classification_accuracy",
+      "value": 1.0,
+      "threshold": 0.9,
+      "passed": true,
+      "failed_cases": []
+    },
+    {
+      "name": "factual_support_accuracy",
+      "value": 1.0,
+      "threshold": 0.9,
+      "passed": true,
+      "failed_cases": []
+    },
+    {
+      "name": "nvidia_recall_at_5",
+      "value": 1.0,
+      "threshold": 0.8,
+      "passed": true,
+      "failed_cases": []
+    },
+    {
+      "name": "nvidia_precision_at_5",
+      "value": 0.7222222222222222,
+      "threshold": 0.6,
+      "passed": true,
+      "failed_cases": []
+    },
+    {
+      "name": "reranking_after_mrr",
+      "value": 1.0,
+      "threshold": 0.8,
+      "passed": true,
+      "failed_cases": []
+    },
+    {
+      "name": "reranking_delta_mrr",
+      "value": 0.5,
+      "threshold": 0.0,
+      "passed": true,
+      "failed_cases": []
+    },
+    {
+      "name": "citation_url_validity",
+      "value": 1.0,
+      "threshold": 0.95,
+      "passed": true,
+      "failed_cases": []
+    },
+    {
+      "name": "citation_recall",
+      "value": 1.0,
+      "threshold": 0.9,
+      "passed": true,
+      "failed_cases": []
+    },
+    {
+      "name": "recommendation_acceptance",
+      "value": 1.0,
+      "threshold": 0.8,
+      "passed": true,
+      "failed_cases": []
+    },
+    {
+      "name": "forbidden_recommendation_avoidance",
+      "value": 1.0,
+      "threshold": 1.0,
+      "passed": true,
+      "failed_cases": []
+    },
+    {
+      "name": "subjective_rubric",
+      "value": 0.9166666666666666,
+      "threshold": 0.75,
+      "passed": true,
+      "failed_cases": []
+    }
+  ],
+  "reranking_before_mrr": 0.5,
+  "reranking_after_mrr": 1.0,
+  "reranking_delta_mrr": 0.5,
+  "evaluated_cases": 3,
+  "human_rubric_status": "evaluated"
+}

@@ -1,0 +1,72 @@
+{
+  "version": "v1",
+  "predictions": [
+    {
+      "case_id": "hand-talk-accessibility",
+      "plan": {"status": "ready", "filters": {"sectors": ["accessibility"], "keywords": ["Hand Talk"]}},
+      "ranked_startups": ["Hand Talk"],
+      "profile_facts": {"product": ["Plataforma de tradução automática"], "ai_use_cases": ["Tradução de português para Libras"]},
+      "classification": "ai-native",
+      "evidence_statuses": {"product:0": "supported", "ai_use_cases:0": "supported"},
+      "nvidia_before_rerank": [
+        {"source_key": "nvidia-inception", "source_url": "https://www.nvidia.com/en-us/startups/"},
+        {"source_key": "riva", "source_url": "https://developer.nvidia.com/riva"},
+        {"source_key": "nvidia-nim", "source_url": "https://www.nvidia.com/en-us/ai-data-science/products/nim-microservices/"}
+      ],
+      "nvidia_after_rerank": [
+        {"source_key": "riva", "source_url": "https://developer.nvidia.com/riva"},
+        {"source_key": "nvidia-nim", "source_url": "https://www.nvidia.com/en-us/ai-data-science/products/nim-microservices/"},
+        {"source_key": "nvidia-inception", "source_url": "https://www.nvidia.com/en-us/startups/"}
+      ],
+      "citation_urls": ["https://www.handtalk.me/br/", "https://developer.nvidia.com/riva"],
+      "recommended_technologies": ["riva", "nvidia_nim"],
+      "rubric": {"relevance": 4, "grounding": 4, "specificity": 3, "actionability": 3}
+    },
+    {
+      "case_id": "vision-health-inference",
+      "plan": {"status": "ready", "filters": {"sectors": ["data_and_ai"], "stages": ["seed"], "keywords": ["saúde", "inferência"]}},
+      "ranked_startups": ["Vision Health"],
+      "profile_facts": {"product": ["Produto de triagem clínica assistida"], "technical_needs": ["Inferência de baixa latência"]},
+      "classification": "ai-native",
+      "evidence_statuses": {"product:0": "supported", "technical_needs:0": "supported"},
+      "nvidia_before_rerank": [
+        {"source_key": "cuda", "source_url": "https://developer.nvidia.com/cuda-toolkit"},
+        {"source_key": "clara", "source_url": "https://www.nvidia.com/en-us/clara/"},
+        {"source_key": "triton-overview", "source_url": "https://developer.nvidia.com/triton-inference-server"},
+        {"source_key": "nvidia-nim", "source_url": "https://www.nvidia.com/en-us/ai-data-science/products/nim-microservices/"}
+      ],
+      "nvidia_after_rerank": [
+        {"source_key": "clara", "source_url": "https://www.nvidia.com/en-us/clara/"},
+        {"source_key": "triton-overview", "source_url": "https://developer.nvidia.com/triton-inference-server"},
+        {"source_key": "nvidia-nim", "source_url": "https://www.nvidia.com/en-us/ai-data-science/products/nim-microservices/"},
+        {"source_key": "cuda", "source_url": "https://developer.nvidia.com/cuda-toolkit"}
+      ],
+      "citation_urls": ["https://vision-health.example.test/product", "https://www.nvidia.com/en-us/clara/"],
+      "recommended_technologies": ["clara", "triton_inference_server"],
+      "rubric": {"relevance": 4, "grounding": 4, "specificity": 3, "actionability": 4}
+    },
+    {
+      "case_id": "finops-analytics-acceleration",
+      "plan": {"status": "ready", "filters": {"sectors": ["financial_services"], "keywords": ["dados tabulares", "anomalias"]}},
+      "ranked_startups": ["FinOps Analytics"],
+      "profile_facts": {"product": ["Detecção de anomalias financeiras"], "technical_needs": ["Aceleração do processamento tabular"]},
+      "classification": "ai-enabled",
+      "evidence_statuses": {"product:0": "supported", "technical_needs:0": "supported"},
+      "nvidia_before_rerank": [
+        {"source_key": "cuda", "source_url": "https://developer.nvidia.com/cuda-toolkit"},
+        {"source_key": "rapids", "source_url": "https://rapids.ai/"},
+        {"source_key": "cudf", "source_url": "https://docs.rapids.ai/api/cudf/stable/"},
+        {"source_key": "cuml", "source_url": "https://docs.rapids.ai/api/cuml/stable/"}
+      ],
+      "nvidia_after_rerank": [
+        {"source_key": "rapids", "source_url": "https://rapids.ai/"},
+        {"source_key": "cudf", "source_url": "https://docs.rapids.ai/api/cudf/stable/"},
+        {"source_key": "cuml", "source_url": "https://docs.rapids.ai/api/cuml/stable/"},
+        {"source_key": "cuda", "source_url": "https://developer.nvidia.com/cuda-toolkit"}
+      ],
+      "citation_urls": ["https://finops.example.test/platform", "https://rapids.ai/"],
+      "recommended_technologies": ["rapids", "cudf"],
+      "rubric": {"relevance": 4, "grounding": 4, "specificity": 4, "actionability": 3}
+    }
+  ]
+}
