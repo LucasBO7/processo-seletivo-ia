@@ -103,8 +103,12 @@ Critérios de aceite:
 - Consultas vazias, compostas apenas por espaços ou caracteres sem conteúdo
   semântico, ou maiores que o limite configurado são rejeitadas antes de chamar
   o modelo.
-- Uma consulta semanticamente alheia à descoberta ou análise de startups pode
+- Uma consulta semanticamente alheia a startups e à análise de seus produtos pode
   ser marcada como `invalid` pelo plano validado.
+- Pedidos de análise de uma startup, recomendação de serviços NVIDIA, identificação
+  de oportunidades tecnológicas ou briefing executivo são executáveis: o plano
+  preserva a startup explicitamente nomeada como palavra-chave e registra os
+  objetivos para os nós posteriores.
 - Saídas que não atendam ao schema passam por no máximo uma tentativa
   configurável de reparo usando o mesmo `ChatModel`.
 - Se a saída continuar inválida, o nó retorna um `RecoverableError` com código

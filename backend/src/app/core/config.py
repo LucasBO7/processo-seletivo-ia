@@ -66,6 +66,7 @@ class GroqConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     api_key: SecretStr | None = None
+    min_request_interval_seconds: float = Field(default=7.0, ge=0, le=300)
 
 
 class LLMProfileConfig(BaseModel):

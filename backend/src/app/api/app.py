@@ -38,7 +38,7 @@ from app.infrastructure.persistence.repositories import (
 )
 from app.infrastructure.providers.cohere import CohereReranker
 from app.infrastructure.providers.embeddings import OpenAICompatibleEmbeddingModel
-from app.infrastructure.providers.groq import create_groq_chat_model
+from app.infrastructure.providers.groq import GroqRequestLimiter, create_groq_chat_model
 from app.infrastructure.retrieval.knowledge_bm25 import KnowledgeBM25Index
 from app.infrastructure.vector.knowledge import QdrantKnowledgeVectorStore
 from app.infrastructure.vector.qdrant import (
@@ -52,15 +52,18 @@ ResourceFactory = Callable[[Settings], Awaitable[ApplicationResources]]
 
 def create_model_registry(settings: Settings) -> ModelRegistry:
     api_key = settings.groq.api_key.get_secret_value() if settings.groq.api_key else None
+    request_limiter = GroqRequestLimiter(settings.groq.min_request_interval_seconds)
     llm_fast = create_groq_chat_model(
         config=settings.llm_fast,
         api_key=api_key,
         profile=ModelProfile.FAST,
+        request_limiter=request_limiter,
     )
     llm_heavy = create_groq_chat_model(
         config=settings.llm_heavy,
         api_key=api_key,
         profile=ModelProfile.HEAVY,
+        request_limiter=request_limiter,
     )
     return ModelRegistry(llm_fast=llm_fast, llm_heavy=llm_heavy)
 

@@ -256,6 +256,7 @@ class RecommendationAgent:
                                 content=build_repair_message(
                                     raw_candidate,
                                     violations=violations,
+                                    context=context_payload,
                                     need_keys=[item.key for item in prepared.needs],
                                     startup_evidence_ids=[
                                         str(item.source_id) for item in prepared.evidence
@@ -273,6 +274,14 @@ class RecommendationAgent:
                 counters["failure_count"] += 1
                 continue
             if batch is None:
+                logger.warning(
+                    "recommendation_candidate_rejected",
+                    extra={
+                        "node": NodeName.RECOMMENDATION,
+                        "prompt_version": PROMPT_VERSION,
+                        "violation_codes": sorted(set(violations)),
+                    },
+                )
                 errors.append(self._error("recommendation_invalid_output"))
                 counters["invalid_batch_count"] += 1
                 counters["failure_count"] += 1

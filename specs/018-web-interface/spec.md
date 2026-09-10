@@ -33,6 +33,9 @@ somente a fundação visual e não permite operar o pipeline.
 - Erros de rede ou respostas incompatíveis são sanitizados antes de serem exibidos.
 - Perguntas e ambiguidades do Query Planner aparecem em linguagem compreensível e
   podem ser usadas como apoio para reformular a consulta.
+- Quando uma análise parcial não produz recomendação ou briefing, a interface
+  explica a etapa bloqueante a partir dos avisos e erros sanitizados da API, sem
+  exibir apenas uma mensagem vazia genérica.
 
 ### US-03 — Explorar startups e análise
 

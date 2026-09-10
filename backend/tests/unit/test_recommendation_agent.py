@@ -281,6 +281,36 @@ async def test_fabricated_chunk_repairs_once_and_publishes_only_valid_batch() ->
     repair_prompt = model.calls[1][1].content
     assert str(context.chunks[0].chunk_id) in repair_prompt
     assert "recommendation_nvidia_chunk_not_allowed" in repair_prompt
+    assert "Core product depends on real-time medical inference" in repair_prompt
+    assert "NVIDIA NIM provides managed API microservices" in repair_prompt
+    assert '"decision_rules":' in repair_prompt
+
+
+@pytest.mark.asyncio
+async def test_repair_prompt_explains_deterministic_priority_and_complexity() -> None:
+    profile, source_ids = profile_fixture()
+    context = context_fixture(profile)
+    invalid = candidate_json(
+        source_ids,
+        context.chunks[0].chunk_id,
+        priority="medium",
+        implementation_complexity="medium",
+    )
+    model = SequenceChatModel([invalid, candidate_json(source_ids, context.chunks[0].chunk_id)])
+
+    patch = await RecommendationAgent(model=model, config=RecommendationConfig())(
+        AppState(validated_profiles=[profile], nvidia_contexts=[context])
+    )
+
+    repair_prompt = model.calls[1][1].content
+    assert patch["errors"] == []
+    assert "recommendation_priority_mismatch" in repair_prompt
+    assert "recommendation_complexity_mismatch" in repair_prompt
+    assert '"need_criticality_score":' in repair_prompt
+    assert '"integration_scope_score":' in repair_prompt
+    assert '"required_repairs":' in repair_prompt
+    assert "Recalculate priority exactly" in repair_prompt
+    assert "Recalculate implementation_complexity exactly" in repair_prompt
 
 
 @pytest.mark.asyncio

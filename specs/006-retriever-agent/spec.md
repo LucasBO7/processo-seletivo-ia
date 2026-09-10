@@ -45,6 +45,10 @@ Critérios de aceite:
   números e intervalos numéricos explícitos.
 - Palavras-chave e sinais de IA procuram correspondência textual em dados da
   startup e em seus documentos.
+- Em uma estratégia `targeted`, se uma palavra-chave corresponder exatamente ao
+  nome de uma startup retornada, o Retriever mantém somente as startups nomeadas
+  explicitamente antes de carregar documentos. Estratégias `exploratory` e
+  `comparative` preservam todos os resultados ranqueados.
 - Todos os valores são enviados ao banco como parâmetros; nenhum texto do plano
   é interpolado em SQL.
 

@@ -80,6 +80,14 @@ O wrapper existe porque `ChatGroq` não implementa diretamente o método
 `ChatModel.complete` já definido pela aplicação. Assim, nenhuma mudança do SDK
 se propaga aos agentes.
 
+## Controle de frequência
+
+Um limitador assíncrono compartilhado pelos dois perfis reserva o início de cada
+chamada sob um lock. O intervalo padrão é de 7 segundos, correspondente aos 2
+segundos derivados dos 30 RPM do plano gratuito acrescidos da folga operacional
+de 5 segundos. O relógio e a função de espera são injetáveis para manter os
+testes rápidos e determinísticos.
+
 ## Política de modelos
 
 Será criado um enum interno de perfil (`fast`, `heavy`) e uma tabela imutável:

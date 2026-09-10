@@ -51,7 +51,9 @@ src/
   recomendações e briefing pelo identificador retornado pela API.
 - Conteúdo externo permanece como texto; somente URLs permitidas viram links.
 - O Markdown original pode ser inspecionado e baixado sem transformação.
-- 12 testes de frontend, lint e build de produção passaram.
+- Ausências de recomendação e briefing explicam a etapa bloqueante usando apenas
+  diagnósticos sanitizados da API.
+- 14 testes de frontend, lint e build de produção passaram.
 
 ## Sugestão de commit
 

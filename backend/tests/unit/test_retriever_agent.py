@@ -15,6 +15,7 @@ from app.graph.agents.retriever import (
     build_search_criteria,
     normalize_locations,
     parse_team_size,
+    retain_explicitly_named_startups,
 )
 from app.graph.contracts import GraphNode
 from app.graph.state import AppState
@@ -145,6 +146,40 @@ def test_treats_brazil_as_country_scope_instead_of_exact_city(country: str) -> N
 
 def test_preserves_specific_city_location_filter() -> None:
     assert normalize_locations(["São Paulo"]) == ("são paulo",)
+
+
+def test_targeted_plan_keeps_only_explicitly_named_startups() -> None:
+    hand_talk = RankedStartup(Startup(name="Hand Talk"), 3.0)
+    incidental = RankedStartup(Startup(name="Outra Acessibilidade"), 2.0)
+    plan = query_plan(
+        filters={"keywords": ["Hand Talk", "acessibilidade"]},
+        analysis_strategy={
+            "mode": "targeted",
+            "objectives": ["analisar a empresa"],
+            "rationale": "A consulta nomeia uma startup.",
+        },
+    )
+
+    result = retain_explicitly_named_startups(plan, [hand_talk, incidental])
+
+    assert result == [hand_talk]
+
+
+def test_comparative_plan_preserves_named_and_incidental_matches() -> None:
+    hand_talk = RankedStartup(Startup(name="Hand Talk"), 3.0)
+    incidental = RankedStartup(Startup(name="Outra Acessibilidade"), 2.0)
+    plan = query_plan(
+        filters={"keywords": ["Hand Talk", "acessibilidade"]},
+        analysis_strategy={
+            "mode": "comparative",
+            "objectives": ["comparar empresas"],
+            "rationale": "A consulta pede comparação.",
+        },
+    )
+
+    result = retain_explicitly_named_startups(plan, [hand_talk, incidental])
+
+    assert result == [hand_talk, incidental]
 
 
 @pytest.mark.asyncio

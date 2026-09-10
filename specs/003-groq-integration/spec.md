@@ -118,6 +118,21 @@ Critérios de aceite:
   de erro, sem prompt, mensagem integral ou resposta bruta.
 - A inicialização das instâncias não realiza chamada de rede nem consome tokens.
 
+### US-05 — Respeitar o limite do plano gratuito
+
+Como pessoa operadora, quero espaçar as chamadas aos modelos para executar o
+pipeline completo sem exceder o limite de requisições por minuto da Groq.
+
+Critérios de aceite:
+
+- Os perfis rápido e pesado compartilham um único limitador assíncrono.
+- O intervalo padrão entre inícios de chamadas é de 7 segundos: 2 segundos
+  derivados do limite gratuito de 30 RPM, acrescidos de 5 segundos de folga.
+- O intervalo pode ser sobrescrito por `GROQ__MIN_REQUEST_INTERVAL_SECONDS`.
+- A espera não bloqueia o event loop e chamadas concorrentes são serializadas.
+- Testes usam relógio e espera falsos, sem chamar uma LLM real nem aguardar o
+  intervalo em tempo de parede.
+
 ## Configuração dos modelos
 
 A configuração conceitual solicitada é:
@@ -137,6 +152,7 @@ Variáveis previstas:
 | Variável | Default | Regra |
 | --- | --- | --- |
 | `GROQ__API_KEY` | sem default | segredo obrigatório ao compor a Groq |
+| `GROQ__MIN_REQUEST_INTERVAL_SECONDS` | `7` | entre `0` e `300` segundos |
 | `LLM_FAST__MODEL` | `openai/gpt-oss-20b` | string não vazia |
 | `LLM_FAST__TEMPERATURE` | `0` | entre `0` e `2` |
 | `LLM_FAST__MAX_TOKENS` | `8192` | entre `1024` e `32768` |
@@ -175,6 +191,8 @@ Variáveis previstas:
 - **RF-09:** permitir substituição dos IDs por configuração.
 - **RF-10:** disponibilizar os recursos para injeção nas specs funcionais dos
   agentes, começando pelo Query Planner da especificação 004.
+- **RF-11:** limitar centralmente a frequência das chamadas Groq entre todos os
+  perfis configurados.
 
 ## Requisitos não funcionais
 
@@ -189,6 +207,7 @@ Variáveis previstas:
   instância durante o ciclo de vida da aplicação.
 - **RNF-07:** manter modelos e parâmetros operacionais configuráveis devido à
   disponibilidade variável dos IDs na Groq.
+- **RNF-08:** aguardar de forma assíncrona, sem bloquear o event loop.
 
 ## Restrições
 
@@ -219,6 +238,7 @@ Variáveis previstas:
 | US-02 | RF-04, RF-05, RNF-01, RNF-02, RNF-06 | Testes do adaptador, composição e arquitetura |
 | US-03 | RF-06, RF-07, RF-10 | Teste parametrizado de todos os `NodeName` |
 | US-04 | RF-08, RNF-03, RNF-04 | Fakes de falhas, inspeção de logs e suíte sem rede |
+| US-05 | RF-11, RNF-08 | Testes determinísticos do intervalo e do compartilhamento do limitador |
 
 ## Critério de conclusão da feature
 

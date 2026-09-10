@@ -31,6 +31,8 @@ A implementação foi autorizada em 6 de setembro de 2026.
 - [x] **T-16 [US-01 a US-04]** Executar Ruff format check, Ruff lint, mypy, import-linter e o comando agregado do backend.
 - [x] **T-17 [US-01 a US-04]** Executar lint, testes e build do frontend para verificar ausência de regressões.
 - [ ] **T-18 [US-01 a US-04]** Revisar os critérios de aceite e marcar a spec como concluída somente após aprovação explícita da entrega.
+- [x] **T-19 [US-05, RF-11, RNF-08]** Implementar e testar o limitador assíncrono
+  compartilhado com intervalo gratuito configurável, sem chamadas reais.
 
 ## Sugestão de commit
 

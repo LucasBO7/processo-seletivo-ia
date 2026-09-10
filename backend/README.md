@@ -1,86 +1,188 @@
-# Backend do NVIDIA Startup AI Radar
+# Backend — NVIDIA Startup AI Radar
 
-Fundação assíncrona e modular descrita na especificação `002-backend-foundation`.
-Os comandos operacionais estão documentados no README da raiz do repositório.
+Guia técnico para desenvolvimento, operação local e manutenção da API. A
+visão do produto está no [README da raiz](../README.md).
 
-## Modelos Groq
+## Stack
 
-A aplicação disponibiliza dois perfis de chat reutilizáveis por meio do contrato
-interno `ChatModel`:
+- Python 3.12+ e `uv`;
+- FastAPI + Uvicorn;
+- LangGraph para orquestração assíncrona;
+- PostgreSQL 16 + SQLAlchemy + Alembic;
+- Qdrant para busca vetorial;
+- BM25 para busca lexical e Cohere Rerank opcional;
+- Groq via `langchain-groq`;
+- Pytest, Ruff, mypy e import-linter.
 
-- `llm_fast`: `openai/gpt-oss-20b`, temperatura `0`;
-- `llm_heavy`: `openai/gpt-oss-120b`, temperatura `0.1`.
+## Pré-requisitos
 
-Defina `GROQ__API_KEY` no arquivo `.env` local antes de iniciar a composição
-completa da aplicação. O valor não deve ser versionado nem registrado em logs.
-Modelos, temperaturas, timeouts e retentativas podem ser substituídos pelos
-grupos `LLM_FAST__` e `LLM_HEAVY__`.
-Como os IDs publicados pela Groq possuem ciclo de vida próprio e podem depender
-das permissões da conta, qualquer substituição deve ser validada no ambiente
-antes de ser promovida.
+- Python 3.12 ou superior;
+- [`uv`](https://docs.astral.sh/uv/);
+- Docker Desktop, recomendado para PostgreSQL e Qdrant;
+- credenciais dos provedores quando o fluxo real exigir Groq, embeddings ou
+  Cohere.
 
-O Query Planner, Extractor, Evidence Validator e NVIDIA RAG usam o perfil rápido.
-Startup Classifier, Recommendation e Briefing usam o perfil pesado. O Retriever
-executa somente código de recuperação e não recebe LLM.
+## Configuração local
 
-## Base NVIDIA
+Na raiz do repositório:
 
-A spec 012 adiciona uma ingestão independente do LangGraph. O manifesto
-`scripts/nvidia_sources.json` cobre NVIDIA Inception, NIM, NeMo, NeMo Guardrails,
-Triton, TensorRT-LLM, RAPIDS, cuDF, cuML, CUDA, Riva, Omniverse, Isaac, Clara,
-Morpheus e NVIDIA AI Enterprise.
+```powershell
+Copy-Item backend/.env.example backend/.env
+```
 
-Use `startup-radar-knowledge ingest`, `dry-run` ou `verify`. O texto e a URL
-oficial em `knowledge_documents.source_url` permanecem canônicos no PostgreSQL;
-Qdrant e BM25 são índices derivados. Testes comuns usam fixtures e embeddings
-falsos e não acessam a rede.
+Preencha no `backend/.env` as variáveis obrigatórias, principalmente
+`POSTGRES__URL`, `QDRANT__URL` e `GROQ__API_KEY`. O arquivo `.env` é ignorado
+pelo Git e nunca deve conter dados versionados.
 
-## Query Planner
+Os perfis de modelo são configuráveis por `LLM_FAST__*` e `LLM_HEAVY__*`. O
+limitador `GROQ__MIN_REQUEST_INTERVAL_SECONDS` controla o intervalo global entre
+chamadas; o padrão operacional para o plano gratuito é 7 segundos.
 
-O Query Planner é um nó assíncrono que depende somente do contrato interno
-`ChatModel`. Ele transforma `AppState.query` em um `QueryPlan` estrito com status
-`ready`, `needs_clarification` ou `invalid`, filtros separados e estratégia de
-análise. Entradas inválidas são rejeitadas antes do modelo e respostas malformadas
-possuem no máximo uma tentativa configurável de reparo.
+## Instalação e execução
 
-Setor, estágio e porte usam Enums canônicos. Aliases conhecidos são
-normalizados; um filtro explícito desconhecido produz `needs_clarification`,
-`unresolved_filters` e três `filter_suggestions` válidas. Consultas que não
-solicitam filtros permanecem exploratórias e executáveis.
+Instale as dependências e aplique as migrações:
 
-Os limites não sensíveis ficam no grupo `QUERY_PLANNER__`: tamanho da consulta,
-itens por lista, perguntas de esclarecimento, justificativa e tentativas de
-reparo. O agente não acessa PostgreSQL, Qdrant ou SDKs concretos e é exposto por
-`POST /api/v1/query-plans`. A rota aceita `{"query": "..."}` e devolve o plano,
-avisos, erros recuperáveis e métricas. Ela ainda não conecta o restante do
-pipeline por si só. As rotas iniciais `/health/live` e `/health/ready` foram removidas pela
-especificação 005.
+```powershell
+uv sync --project backend --locked --all-groups
+uv run --project backend alembic -c backend/alembic.ini upgrade head
+```
 
-## Retriever
+Suba as dependências locais:
 
-O Retriever Agent recebe um `QueryPlan` com status `ready`, consulta startups no
-PostgreSQL e carrega seus documentos em lote. Setor, estágio e localização são
-filtros sem diferença de caixa; portes conhecidos e intervalos numéricos são
-traduzidos para `team_size`; palavras-chave e sinais de IA contribuem para o
-score textual. A ordenação usa score, nome e UUID para permanecer determinística.
+```powershell
+docker compose up -d
+docker compose ps
+```
 
-Os Enums de setor e estágio são expandidos para rótulos persistidos. Por
-exemplo, `financial_services` consulta `Fintech / Crédito` e
-`SaaS de Gestão Financeira` com OR, sem reescrever os dados importados.
+Inicie a API:
 
-As saídas usam `candidate_startups` e `selected_sources`, preservando UUIDs e
-URLs. Os limites `RETRIEVER__MAX_RESULTS` e `RETRIEVER__EXCERPT_LENGTH` controlam
-quantidade de candidatos e tamanho dos trechos. O agente ainda não possui rota
-HTTP isolada.
+```powershell
+uv run --project backend startup-radar
+```
 
-## Orquestração disponível
+A API fica em `http://127.0.0.1:8000`. Para encerrar apenas os containers do
+projeto:
 
-O workflow compilado conecta `START → query_planner → retriever → END`. O
-Retriever é chamado somente para planos `ready`; ambiguidade, consulta inválida
-ou falha do Planner encerram o fluxo antes do PostgreSQL. O grafo é criado uma
-vez no lifespan, não utiliza checkpointer e recebe um estado novo por requisição.
+```powershell
+docker compose down
+```
 
-`POST /api/v1/search` aceita `{"query": "..."}` e devolve `query_plan`,
-`candidate_startups`, `selected_sources`, avisos, erros e métricas. UUIDs e URLs
-das fontes são preservados. A rota `/api/v1/query-plans` permanece disponível
-para executar somente o Planner.
+Se aparecer `WinError 10048`, já existe outro `startup-radar` usando a porta
+8000. Encerre a instância anterior ou libere a porta antes de iniciar outra.
+
+## Endpoints principais
+
+| Endpoint | Uso |
+| --- | --- |
+| `POST /api/v1/search` | Executa o pipeline completo de análise |
+| `POST /api/v1/query-plans` | Executa apenas o Query Planner |
+| `GET /api/v1/docs` | Swagger UI |
+| `GET /api/v1/openapi.json` | Contrato OpenAPI |
+
+Exemplo mínimo:
+
+```json
+{
+  "query": "Analise a Neurotech"
+}
+```
+
+## Arquitetura de pastas
+
+```text
+backend/
+├── pyproject.toml          # dependências, scripts e ferramentas
+├── uv.lock                 # resolução reproduzível
+├── alembic.ini             # configuração de migrações
+├── migrations/             # schema PostgreSQL versionado
+├── scripts/                # manifesto e operações da base NVIDIA
+├── evaluation/             # datasets e relatórios de qualidade
+├── src/app/
+│   ├── api/                # FastAPI, rotas, erros e middleware
+│   ├── application/
+│   │   ├── contracts/      # contratos Pydantic entre etapas
+│   │   ├── ports/          # interfaces de persistência e provedores
+│   │   └── services/       # casos de uso de aplicação
+│   ├── domain/             # modelos independentes de frameworks
+│   ├── graph/
+│   │   ├── agents/         # oito agentes do pipeline
+│   │   ├── prompts/        # prompts e formatos estruturados
+│   │   ├── builder.py      # topologia e roteamento do grafo
+│   │   ├── state.py        # AppState compartilhado
+│   │   └── model_policy.py # alocação fast/heavy/none
+│   ├── infrastructure/
+│   │   ├── persistence/    # PostgreSQL e repositórios SQLAlchemy
+│   │   ├── providers/      # Groq, embeddings e Cohere
+│   │   ├── retrieval/      # índice BM25
+│   │   ├── vector/         # cliente e store Qdrant
+│   │   └── ingestion/      # coleta e chunking NVIDIA
+│   ├── core/               # settings, logging e recursos do lifespan
+│   └── main.py             # entrypoint Windows/Linux
+└── tests/
+    ├── unit/               # testes rápidos, offline e com fakes
+    ├── integration/        # PostgreSQL/Qdrant reais, opt-in
+    └── external/           # fontes externas, opt-in
+```
+
+## Fluxo de execução
+
+```text
+API request
+  → query_planner
+  → retriever (PostgreSQL)
+  → extractor
+  → startup_classifier
+  → evidence_validator
+  → nvidia_rag (Qdrant + BM25 + reranker opcional)
+  → recommendation
+  → briefing
+```
+
+O `AppState` carrega somente contratos tipados, IDs, fontes, avisos, erros e
+métricas. O composition root em `src/app/api/app.py` cria clientes, repositórios,
+agentes e o workflow uma vez por lifespan. O Retriever não usa LLM.
+
+## Ingestão da base NVIDIA
+
+O manifesto de fontes está em `scripts/nvidia_sources.json`. Os comandos
+disponíveis são:
+
+```powershell
+uv run --project backend startup-radar-knowledge --help
+uv run --project backend startup-radar-knowledge ingest
+uv run --project backend startup-radar-knowledge verify
+```
+
+PostgreSQL é a fonte de verdade; Qdrant e BM25 são índices derivados. A
+ingestão real exige as credenciais configuradas para embeddings e reranking.
+
+## Testes e qualidade
+
+Testes padrão não chamam LLMs reais:
+
+```powershell
+uv run --project backend pytest -c backend/pyproject.toml backend/tests/unit -q
+uv run --project backend ruff check backend/src backend/tests
+uv run --project backend ruff format --check backend/src backend/tests backend/migrations
+uv run --project backend mypy backend/src
+```
+
+Integrações exigem PostgreSQL/Qdrant ativos e são opt-in:
+
+```powershell
+$env:RUN_INTEGRATION_TESTS = "1"
+uv run --project backend pytest -c backend/pyproject.toml backend/tests/integration -q
+```
+
+Use fakes (`FakeChatModel`, `SequenceChatModel` e adaptadores falsos) em novos
+testes unitários. Nunca coloque chaves, prompts completos ou respostas brutas
+em logs, fixtures versionadas ou mensagens de erro.
+
+## Convenções de desenvolvimento
+
+- Agentes dependem de portas internas, nunca de SDKs concretos.
+- Toda saída de modelo deve ser validada por contrato Pydantic e por regras
+  semânticas determinísticas.
+- Mudanças de comportamento devem atualizar a spec correspondente e suas tasks.
+- Para novas integrações, configure timeout finito, erro sanitizado e teste com
+  cliente falso.

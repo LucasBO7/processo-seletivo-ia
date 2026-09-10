@@ -15,12 +15,13 @@ from app.application.contracts.filter_taxonomy import (
     resolve_company_sizes,
 )
 from app.application.contracts.query_plan import (
+    AnalysisMode,
     NumericTeamSizeRange,
     QueryPlan,
     QueryPlanStatus,
     normalize_unique,
 )
-from app.application.contracts.retrieval import StartupSearchCriteria, TeamSizeRange
+from app.application.contracts.retrieval import RankedStartup, StartupSearchCriteria, TeamSizeRange
 from app.application.ports.repositories import StartupDocumentRepository, StartupRepository
 from app.core.config import RetrieverConfig
 from app.domain.models import RecoverableError, SourceReference, StartupDocument
@@ -80,6 +81,17 @@ def parse_team_size(value: CompanySize | NumericTeamSizeRange | str) -> TeamSize
     return None
 
 
+def retain_explicitly_named_startups(
+    plan: QueryPlan, ranked: list[RankedStartup]
+) -> list[RankedStartup]:
+    """Narrow targeted searches when a keyword is exactly a returned startup name."""
+    if plan.analysis_strategy.mode is not AnalysisMode.TARGETED:
+        return ranked
+    keywords = {normalize_taxonomy_key(value) for value in plan.filters.keywords}
+    named = [item for item in ranked if normalize_taxonomy_key(item.startup.name) in keywords]
+    return named or ranked
+
+
 class RetrieverAgent:
     def __init__(
         self,
@@ -104,6 +116,7 @@ class RetrieverAgent:
             ranked = await self._startups.search(
                 build_search_criteria(plan), limit=self._config.max_results
             )
+            ranked = retain_explicitly_named_startups(plan, ranked)
             documents = (
                 await self._documents.list_for_startups([item.startup.id for item in ranked])
                 if ranked

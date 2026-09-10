@@ -25,6 +25,7 @@ def test_settings_parse_nested_values() -> None:
     assert settings.qdrant.embedding_dimension == 768
     assert settings.qdrant.distance == "dot"
     assert settings.reranker.provider == "cohere"
+    assert settings.groq.min_request_interval_seconds == 7
     assert settings.llm_fast.model == "openai/gpt-oss-20b"
     assert settings.llm_fast.temperature == 0
     assert settings.llm_heavy.model == "openai/gpt-oss-120b"
@@ -242,6 +243,7 @@ def test_query_planner_limits_reject_values_above_contract(field: str, value: in
 
 
 def test_llm_profiles_parse_environment_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GROQ__MIN_REQUEST_INTERVAL_SECONDS", "9.5")
     monkeypatch.setenv("LLM_FAST__MODEL", "fast-override")
     monkeypatch.setenv("LLM_FAST__TEMPERATURE", "0.25")
     monkeypatch.setenv("LLM_FAST__MAX_TOKENS", "4096")
@@ -256,6 +258,7 @@ def test_llm_profiles_parse_environment_overrides(monkeypatch: pytest.MonkeyPatc
     )
 
     assert settings.llm_fast.model == "fast-override"
+    assert settings.groq.min_request_interval_seconds == 9.5
     assert settings.llm_fast.temperature == 0.25
     assert settings.llm_fast.max_tokens == 4096
     assert settings.llm_fast.timeout_seconds == 12

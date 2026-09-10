@@ -7,6 +7,7 @@ from app.application.ports.providers import ChatMessage, ChatModel, RankedDocume
 from app.core.config import LLMProfileConfig, Settings
 from app.graph.model_policy import ModelProfile, ModelRegistry
 from app.graph.state import AppState
+from app.infrastructure.providers.groq import GroqRequestLimiter
 from tests.fakes.providers import FakeChatModel, FakeEmbeddingModel, FakeReranker
 
 
@@ -25,10 +26,16 @@ async def test_provider_fakes_are_deterministic() -> None:
 
 
 def test_composition_builds_each_shared_model_once(monkeypatch: pytest.MonkeyPatch) -> None:
-    calls: list[tuple[LLMProfileConfig, str | None, str]] = []
+    calls: list[tuple[LLMProfileConfig, str | None, str, GroqRequestLimiter]] = []
 
-    def factory(*, config: LLMProfileConfig, api_key: str | None, profile: str) -> ChatModel:
-        calls.append((config, api_key, profile))
+    def factory(
+        *,
+        config: LLMProfileConfig,
+        api_key: str | None,
+        profile: str,
+        request_limiter: GroqRequestLimiter,
+    ) -> ChatModel:
+        calls.append((config, api_key, profile, request_limiter))
         return FakeChatModel(profile)
 
     monkeypatch.setattr("app.api.app.create_groq_chat_model", factory)
@@ -42,8 +49,9 @@ def test_composition_builds_each_shared_model_once(monkeypatch: pytest.MonkeyPat
     registry = create_model_registry(settings)
 
     assert len(calls) == 2
-    assert calls[0] == (settings.llm_fast, "groq-secret", ModelProfile.FAST)
-    assert calls[1] == (settings.llm_heavy, "groq-secret", ModelProfile.HEAVY)
+    assert calls[0][:3] == (settings.llm_fast, "groq-secret", ModelProfile.FAST)
+    assert calls[1][:3] == (settings.llm_heavy, "groq-secret", ModelProfile.HEAVY)
+    assert calls[0][3] is calls[1][3]
     assert registry.llm_fast is not registry.llm_heavy
 
 

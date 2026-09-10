@@ -26,9 +26,26 @@ function submitQuery(query = 'startups de saúde com IA') {
   fireEvent.click(screen.getByRole('button', { name: /analisar startups/i }))
 }
 
-afterEach(() => vi.restoreAllMocks())
+afterEach(() => {
+  vi.restoreAllMocks()
+  vi.unstubAllEnvs()
+})
 
 describe('HomePage', () => {
+  it('executa a demonstração completa sem chamar serviços externos', async () => {
+    vi.stubEnv('VITE_DEMO_MODE', 'true')
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    render(<HomePage />)
+
+    submitQuery('Analise a Neurotech')
+
+    expect(screen.getByText(/pipeline em execução/i)).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Neurotech' })).toBeInTheDocument()
+    expect(screen.getByText(/modo demonstração/i)).toBeInTheDocument()
+    expect(screen.getByText(/NVIDIA NIM é uma oportunidade/i)).toBeInTheDocument()
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
   it('valida a consulta antes de chamar a API', () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch')
     render(<HomePage />)

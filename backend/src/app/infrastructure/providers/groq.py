@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from typing import Protocol, cast
 
 from groq import APIConnectionError, APIStatusError, APITimeoutError, AuthenticationError
@@ -20,9 +21,38 @@ from app.core.config import LLMProfileConfig
 
 logger = logging.getLogger(__name__)
 
+Clock = Callable[[], float]
+Sleeper = Callable[[float], Awaitable[None]]
+
 
 class AsyncChatClient(Protocol):
     async def ainvoke(self, messages: Sequence[BaseMessage]) -> AIMessage: ...
+
+
+class GroqRequestLimiter:
+    """Space request starts across every model profile without blocking the loop."""
+
+    def __init__(
+        self,
+        min_interval_seconds: float,
+        *,
+        clock: Clock = time.monotonic,
+        sleep: Sleeper = asyncio.sleep,
+    ) -> None:
+        self._min_interval_seconds = min_interval_seconds
+        self._clock = clock
+        self._sleep = sleep
+        self._lock = asyncio.Lock()
+        self._last_started_at: float | None = None
+
+    async def wait_for_slot(self) -> None:
+        async with self._lock:
+            now = self._clock()
+            if self._last_started_at is not None:
+                remaining = self._min_interval_seconds - (now - self._last_started_at)
+                if remaining > 0:
+                    await self._sleep(remaining)
+            self._last_started_at = self._clock()
 
 
 def _to_langchain_message(message: ChatMessage) -> BaseMessage:
@@ -51,12 +81,22 @@ def _provider_error_code(error: Exception) -> ChatModelErrorCode:
 
 
 class GroqChatModel:
-    def __init__(self, *, client: AsyncChatClient, profile: str, model: str) -> None:
+    def __init__(
+        self,
+        *,
+        client: AsyncChatClient,
+        profile: str,
+        model: str,
+        request_limiter: GroqRequestLimiter | None = None,
+    ) -> None:
         self._client = client
         self._profile = profile
         self._model = model
+        self._request_limiter = request_limiter
 
     async def complete(self, messages: Sequence[ChatMessage]) -> str:
+        if self._request_limiter is not None:
+            await self._request_limiter.wait_for_slot()
         started_at = time.perf_counter()
         try:
             converted = [_to_langchain_message(message) for message in messages]
@@ -100,6 +140,7 @@ def create_groq_chat_model(
     config: LLMProfileConfig,
     api_key: str | None,
     profile: str,
+    request_limiter: GroqRequestLimiter | None = None,
 ) -> ChatModel:
     if not api_key:
         raise ChatModelError(
@@ -119,4 +160,5 @@ def create_groq_chat_model(
         client=cast(AsyncChatClient, client),
         profile=profile,
         model=config.model,
+        request_limiter=request_limiter,
     )

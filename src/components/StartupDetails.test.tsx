@@ -47,4 +47,34 @@ describe('StartupDetails', () => {
     expect(click).toHaveBeenCalledOnce()
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:briefing')
   })
+
+  it('explica quando o validador bloqueia recomendação e briefing', () => {
+    render(<StartupDetails response={{
+      ...baseResponse,
+      briefings: [],
+      errors: [{ code: 'evidence_validator_unavailable', message: 'Falha segura.', node: 'evidence_validator' }],
+    }} startupId="one" />)
+
+    expect(screen.getByText(/validação de evidências ficou indisponível/i)).toBeInTheDocument()
+    expect(screen.getByText(/briefing depende de pelo menos uma recomendação/i)).toBeInTheDocument()
+  })
+
+  it('distingue ausência de necessidade de contexto NVIDIA insuficiente', () => {
+    const response = {
+      ...baseResponse,
+      briefings: [],
+      warnings: ['recommendation_no_identified_need'],
+      nvidia_contexts: [{
+        startup_id: 'one',
+        startup_name: 'Alpha / Brasil',
+        chunks: [],
+        gaps: [],
+        sufficiency: { status: 'sufficient' as const, reasons: [] },
+      }],
+    }
+
+    render(<StartupDetails response={response} startupId="one" />)
+
+    expect(screen.getByText(/nenhuma necessidade técnica validada/i)).toBeInTheDocument()
+  })
 })

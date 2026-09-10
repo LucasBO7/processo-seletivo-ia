@@ -13,6 +13,7 @@ from app.core.config import QueryPlannerConfig
 from app.graph.agents.query_planner import QueryPlannerAgent, create_query_planner_agent
 from app.graph.contracts import GraphNode
 from app.graph.model_policy import ModelRegistry
+from app.graph.prompts.query_planner import build_messages
 from app.graph.state import AppState
 from tests.fakes.providers import FakeChatModel, SequenceChatModel
 
@@ -276,6 +277,16 @@ async def test_invalid_domain_query_returns_plan_and_stable_error() -> None:
 
     assert update["query_plan"].status is QueryPlanStatus.INVALID
     assert update["errors"][0].code == "query_invalid"
+
+
+def test_prompt_keeps_nvidia_recommendation_analysis_in_scope() -> None:
+    system, _ = build_messages(
+        "Analise a Hand Talk e recomende serviços NVIDIA adequados ao produto."
+    )
+
+    assert "recommend NVIDIA services" in system
+    assert "executive briefing" in system
+    assert "Do not mark such requests invalid" in system
 
 
 @pytest.mark.asyncio

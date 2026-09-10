@@ -191,6 +191,9 @@ indisponibilidade para 503. Ausência de fatos aprovados permanece HTTP 200.
 - Afirmações e classificações recebem avaliações documentais estruturadas.
 - Perfis validados contêm somente fatos `supported`, com fontes de suporte.
 - Rejeições, conflitos e lacunas são preservados em coleções separadas.
+- Em indisponibilidade do modelo, fatos que aparecem literalmente nas fontes
+  originalmente citadas permanecem aprovados por um fallback local conservador;
+  classificações e fatos sem correspondência literal continuam insuficientes.
 - Validator conectado ao LangGraph após o Classifier e exposto na API de busca.
 - Testes, integração PostgreSQL, qualidade, cobertura e frontend aprovados.
 

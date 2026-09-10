@@ -19,6 +19,7 @@
 - [x] **T-09 [US-06]** Cobrir os principais fluxos e estados com testes offline.
 - [x] **T-10 [US-06]** Atualizar README e verificar ausência de segredos no bundle.
 - [x] **T-11 [US-01 a US-06]** Executar lint, testes e build e revisar os critérios.
+- [x] **T-12 [US-02, US-03]** Explicar ausências de recomendação e briefing com diagnósticos sanitizados da etapa bloqueante.
 
 ## Sugestão de commit
 

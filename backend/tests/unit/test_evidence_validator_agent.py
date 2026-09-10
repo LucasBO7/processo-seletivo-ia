@@ -357,6 +357,62 @@ async def test_validator_sanitizes_provider_failure() -> None:
 
 
 @pytest.mark.asyncio
+async def test_provider_failure_preserves_only_literal_cited_facts() -> None:
+    startup_id = uuid4()
+    source = source_for(
+        startup_id,
+        excerpt=(
+            "A Hand Talk usa um modelo proprietário de tradução para Libras e "
+            "precisa reduzir a latência de geração do avatar."
+        ),
+    )
+    profile = StructuredStartupProfile(
+        startup_id=startup_id,
+        name="Hand Talk",
+        product=ExtractedFact(
+            value="modelo proprietário de tradução para Libras",
+            sources=[pointer(source)],
+        ),
+        technical_needs=[
+            ExtractedFact(
+                value="reduzir a latência de geração do avatar",
+                sources=[pointer(source)],
+            )
+        ],
+        claims=[
+            ExtractedFact(
+                value="atende todos os idiomas do mundo",
+                sources=[pointer(source)],
+            )
+        ],
+        unknown_fields=[
+            field
+            for field in ProfileField
+            if field
+            not in {ProfileField.PRODUCT, ProfileField.TECHNICAL_NEEDS, ProfileField.CLAIMS}
+        ],
+    )
+    model = SequenceChatModel(
+        [ChatModelError(ChatModelErrorCode.UNAVAILABLE, "private-provider-detail")]
+    )
+
+    result = await EvidenceValidatorAgent(model=model, config=EvidenceValidatorConfig())(
+        state_for(source, profile=profile)
+    )
+
+    validated = result["validated_profiles"][0]
+    assert validated.product is not None
+    assert [item.value for item in validated.technical_needs] == [
+        "reduzir a latência de geração do avatar"
+    ]
+    assert validated.claims == []
+    assert result["validated_classifications"] == []
+    assert "evidence_validator_literal_fallback" in result["warnings"]
+    assert result["errors"][0].code == "evidence_validator_unavailable"
+    assert result["metrics"]["evidence_validator_literal_fallback_supported_count"] == 2.0
+
+
+@pytest.mark.asyncio
 async def test_validator_truncates_context_and_logs_no_content(
     caplog: pytest.LogCaptureFixture,
 ) -> None:

@@ -11,7 +11,11 @@ from langchain_core.messages import AIMessage, BaseMessage
 
 from app.application.ports.providers import ChatMessage, ChatModelError, ChatModelErrorCode
 from app.core.config import LLMProfileConfig
-from app.infrastructure.providers.groq import GroqChatModel, create_groq_chat_model
+from app.infrastructure.providers.groq import (
+    GroqChatModel,
+    GroqRequestLimiter,
+    create_groq_chat_model,
+)
 
 
 class FakeAsyncChatClient:
@@ -57,6 +61,42 @@ async def test_adapter_rejects_unknown_role_without_calling_client() -> None:
 
     assert error.value.code is ChatModelErrorCode.INVALID_MESSAGE
     assert client.calls == []
+
+
+async def test_shared_limiter_spaces_requests_across_profiles() -> None:
+    now = 100.0
+    waits: list[float] = []
+
+    def clock() -> float:
+        return now
+
+    async def sleep(delay: float) -> None:
+        nonlocal now
+        waits.append(delay)
+        now += delay
+
+    limiter = GroqRequestLimiter(7, clock=clock, sleep=sleep)
+    fast_client = FakeAsyncChatClient(AIMessage(content="fast"))
+    heavy_client = FakeAsyncChatClient(AIMessage(content="heavy"))
+    fast = GroqChatModel(
+        client=fast_client,
+        profile="fast",
+        model="fast-model",
+        request_limiter=limiter,
+    )
+    heavy = GroqChatModel(
+        client=heavy_client,
+        profile="heavy",
+        model="heavy-model",
+        request_limiter=limiter,
+    )
+
+    assert await fast.complete([ChatMessage(role="user", content="first")]) == "fast"
+    assert await heavy.complete([ChatMessage(role="user", content="second")]) == "heavy"
+
+    assert waits == [7]
+    assert len(fast_client.calls) == 1
+    assert len(heavy_client.calls) == 1
 
 
 async def test_adapter_rejects_non_text_response() -> None:

@@ -29,6 +29,11 @@ AppState.query_plan
 - busca textual simples é suficiente para a base MVP de 30–80 startups; full-text
   e ranking híbrido permanecem para specs próprias.
 
+Em planos `targeted`, uma palavra-chave igual ao nome normalizado de uma startup
+restringe o lote aos nomes explícitos. A decisão acontece depois do ranking e antes
+da leitura dos documentos, reduzindo chamadas posteriores sem alterar buscas
+exploratórias ou comparativas.
+
 ## Verificação
 
 1. Testar tradução de critérios e agente com fakes.

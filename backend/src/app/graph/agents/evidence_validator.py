@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import time
 from dataclasses import dataclass, replace
 from uuid import UUID
@@ -86,6 +87,7 @@ class EvidenceValidatorAgent:
         validated_classifications = list(state.get("validated_classifications", []))
         model_calls = repairs = failures = source_count = 0
         processed = supported = unsupported = conflicting = insufficient = 0
+        literal_fallback_supported = 0
         provider_failed = False
 
         for profile in profiles:
@@ -171,12 +173,15 @@ class EvidenceValidatorAgent:
                         errors.append(self._error("evidence_validator_unavailable"))
                         failures += 1
                         provider_failed = True
-                        local_assessments.update(
-                            {
-                                item.key: self._insufficient_assessment(item.key, startup_sources)
-                                for item in requested[start:]
-                            }
+                        fallback = {
+                            item.key: self._literal_fallback_assessment(item, bounded_sources)
+                            for item in requested[start:]
+                        }
+                        literal_fallback_supported += sum(
+                            assessment.status is EvidenceStatus.SUPPORTED
+                            for assessment in fallback.values()
                         )
+                        local_assessments.update(fallback)
                         break
                     if output is None:
                         errors.append(self._error("evidence_validator_invalid_output"))
@@ -258,6 +263,8 @@ class EvidenceValidatorAgent:
         ]
         if profiles and not validated_claims:
             warnings.append("validator_no_supported_claims")
+        if literal_fallback_supported:
+            warnings.append("evidence_validator_literal_fallback")
         if not any(
             any(getattr(profile, field.value) not in (None, []) for field in ProfileField)
             for profile in validated_profiles
@@ -283,6 +290,9 @@ class EvidenceValidatorAgent:
                 "evidence_validator_model_call_count": float(model_calls),
                 "evidence_validator_repair_count": float(repairs),
                 "evidence_validator_failure_count": float(failures),
+                "evidence_validator_literal_fallback_supported_count": float(
+                    literal_fallback_supported
+                ),
             }
         )
         logger.log(
@@ -448,6 +458,48 @@ class EvidenceValidatorAgent:
                 )
                 for source in sources
             ],
+        )
+
+    @staticmethod
+    def _literal_fallback_assessment(
+        item: ClaimItem, sources: list[SourceReference]
+    ) -> ClaimAssessmentOutput:
+        if item.key == CLASSIFICATION_KEY:
+            return EvidenceValidatorAgent._insufficient_assessment(item.key, sources)
+        cited = {
+            (source.startup_id, source.source_id, source.source_url) for source in item.fact.sources
+        }
+        normalized_value = " ".join(item.fact.value.casefold().split())
+        assessments: list[SourceAssessment] = []
+        has_literal_support = False
+        for source in sources:
+            key = (source.startup_id, source.source_id, source.source_url)
+            normalized_excerpt = " ".join((source.excerpt or "").casefold().split())
+            supports = bool(
+                key in cited
+                and normalized_value
+                and re.search(rf"(?<!\w){re.escape(normalized_value)}(?!\w)", normalized_excerpt)
+            )
+            has_literal_support = has_literal_support or supports
+            assessments.append(
+                SourceAssessment(
+                    startup_id=source.startup_id,
+                    source_id=source.source_id,
+                    source_url=source.source_url,
+                    verdict=(SourceVerdict.SUPPORTS if supports else SourceVerdict.NOT_FOUND),
+                )
+            )
+        return ClaimAssessmentOutput(
+            claim_key=item.key,
+            status=(
+                EvidenceStatus.SUPPORTED if has_literal_support else EvidenceStatus.INSUFFICIENT
+            ),
+            justification=(
+                "The claim appears literally in an originally cited document."
+                if has_literal_support
+                else "The available documentary evidence is insufficient."
+            ),
+            analyzed_sources=assessments,
         )
 
     @staticmethod

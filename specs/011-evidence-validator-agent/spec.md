@@ -198,6 +198,10 @@ Critérios de aceite:
 - Invalidade persistente gera `evidence_validator_invalid_output` sanitizado.
 - Indisponibilidade gera `evidence_validator_unavailable` sanitizado.
 - Resultados concluídos antes de uma falha permanecem no estado.
+- Quando o modelo fica indisponível, um fallback local pode aprovar somente fatos
+  cujo valor normalizado apareça literalmente em uma fonte originalmente citada.
+  Os demais fatos e a classificação permanecem `insufficient`; o fallback não
+  infere, parafraseia nem remove o erro de indisponibilidade.
 
 ### US-08 — Orquestrar e observar o nó
 
@@ -323,6 +327,7 @@ startup_classifier
 | `validator_no_supported_claims` | aviso | Nenhuma afirmação extraída foi aprovada |
 | `evidence_validator_context_truncated` | aviso | Contexto excedeu limite configurado |
 | `evidence_validator_source_gap` | aviso | Há fonte ausente, inválida ou sem conteúdo |
+| `evidence_validator_literal_fallback` | aviso | Fatos literais foram preservados durante indisponibilidade do modelo |
 | `evidence_validator_invalid_output` | erro | Saída continuou inválida após reparo |
 | `evidence_validator_unavailable` | erro | Modelo não concluiu a validação |
 
@@ -338,6 +343,7 @@ startup_classifier
 - **RF-08:** tratar ausência total de fatos aprovados sem fabricar conteúdo.
 - **RF-09:** executar no máximo uma tentativa configurável de reparo.
 - **RF-10:** preservar resultados parciais e falhas sanitizadas.
+- **RF-10A:** preservar por fallback somente suporte literal rastreável quando o modelo estiver indisponível.
 - **RF-11:** adicionar Validator e roteamento após o Classifier no grafo.
 - **RF-12:** expor resultados na API e mapear erros HTTP.
 - **RF-13:** resolver `llm_fast` pela política central.

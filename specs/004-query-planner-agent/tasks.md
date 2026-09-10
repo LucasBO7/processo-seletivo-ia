@@ -17,6 +17,7 @@ A implementação foi autorizada explicitamente em 6 de setembro de 2026.
 - [x] **T-08 [US-03, RF-07, RF-12]** Implementar os resultados `ready`, `needs_clarification` e `invalid`, preservando filtros inequívocos e sinalizando bloqueio para o futuro Retriever.
 - [x] **T-09 [US-04, RF-06, RF-08, RF-11]** Implementar reparo limitado de saída malformada e conversão de falhas em `RecoverableError` sanitizado.
 - [x] **T-10 [US-04, US-05, RNF-03]** Adicionar logging por allowlist com status, duração e versão do prompt, sem consulta integral, prompt ou resposta bruta.
+- [x] **T-10A [US-01, US-02, US-04]** Manter no escopo consultas que analisam uma startup ou solicitam recomendação NVIDIA/briefing; somente pedidos sem relação com startups ou sua análise podem ser `invalid`.
 
 ## Testes
 
@@ -24,6 +25,7 @@ A implementação foi autorizada explicitamente em 6 de setembro de 2026.
 - [x] **T-12 [US-03]** Testar consulta ampla válida, ambiguidades bloqueantes, perguntas de esclarecimento e preservação de filtros inequívocos.
 - [x] **T-13 [US-04, RNF-06]** Testar entradas inválidas sem chamada ao modelo, consulta alheia, JSON inválido, campos extras, enums inválidos, reparo e indisponibilidade do modelo.
 - [x] **T-14 [US-05, RNF-03, RNF-05, RNF-07]** Testar atualização parcial, compatibilidade com `GraphNode`, prompt injection, sanitização e ausência de rede, clientes ou segredos no estado e nos logs.
+- [x] **T-14A [US-01, US-02]** Testar que o prompt instrui o modelo a aceitar recomendações NVIDIA e briefing como objetivos de análise válidos.
 - [x] **T-15 [US-05, RNF-09]** Atualizar testes arquiteturais quando necessário e executar a suíte completa com cobertura mínima de 80%.
 
 ## Documentação e verificação final

@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { AnalysisClientError, analyzeStartups } from "../api/analysis-client";
+import { AnalysisClientError, analyzeStartups, isDemoMode } from "../api/analysis-client";
 import type { SearchResponse } from "../api/analysis-types";
 import { AnalysisState, LoadingState } from "../components/AnalysisState";
 import { SearchForm } from "../components/SearchForm";
@@ -50,7 +50,9 @@ export function HomePage() {
             <strong>NVIDIA Startup AI Radar</strong>
             <span>Inteligência de ecossistema</span>
           </div>
-          {/* <span className="status-pill"><i aria-hidden="true" /> API integrada</span> */}
+          {isDemoMode() && (
+            <span className="status-pill"><i aria-hidden="true" /> Modo demonstração</span>
+          )}
         </nav>
       </header>
 

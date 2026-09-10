@@ -207,6 +207,14 @@ class BriefingAgent:
                 counters["failure_count"] += 1
                 continue
             if narrative is None:
+                logger.warning(
+                    "briefing_candidate_rejected",
+                    extra={
+                        "node": NodeName.BRIEFING,
+                        "prompt_version": PROMPT_VERSION,
+                        "violation_codes": sorted(set(violations)),
+                    },
+                )
                 errors.append(self._error("briefing_invalid_output"))
                 counters["invalid_batch_count"] += 1
                 counters["failure_count"] += 1

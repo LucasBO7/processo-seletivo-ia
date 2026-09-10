@@ -1,7 +1,13 @@
 import type { SearchResponse } from './analysis-types'
+import { demoSearchResponse } from './demo-response'
 
 const DEFAULT_API_URL = 'http://127.0.0.1:8000'
 const REQUEST_TIMEOUT_MS = 180_000
+const DEMO_DELAY_MS = 600
+
+export function isDemoMode(): boolean {
+  return import.meta.env.VITE_DEMO_MODE === 'true'
+}
 
 function apiBaseUrl(): string {
   const configured = import.meta.env.VITE_API_BASE_URL?.trim()
@@ -26,6 +32,11 @@ export class AnalysisClientError extends Error {
 }
 
 export async function analyzeStartups(query: string): Promise<SearchResponse> {
+  if (isDemoMode()) {
+    await new Promise((resolve) => window.setTimeout(resolve, DEMO_DELAY_MS))
+    return demoSearchResponse(query)
+  }
+
   const controller = new AbortController()
   const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
 

@@ -144,7 +144,7 @@ export function StartupDetails({ response, startupId }: StartupDetailsProps) {
               {item.nvidia_evidence.map((source) => <ExternalLink key={source.chunk_id} url={source.source_url} requireHttps>Fonte NVIDIA</ExternalLink>)}
             </div>
           </article>
-        ))}</div> : <EmptyText text="Nenhuma recomendação foi produzida." />}
+        ))}</div> : <EmptyText text={missingRecommendationText(response, startupId)} />}
       </section>
 
       <section className="detail-section" aria-labelledby="briefing-title">
@@ -160,7 +160,7 @@ export function StartupDetails({ response, startupId }: StartupDetailsProps) {
               <pre>{briefing.markdown}</pre>
             </details>
           </div>
-        ) : <EmptyText text="Briefing não disponível para esta startup." />}
+        ) : <EmptyText text={missingBriefingText(response, startupId)} />}
       </section>
     </article>
   )
@@ -233,4 +233,35 @@ function SectionTitle({ id, number, title }: { id: string; number: string; title
 
 function EmptyText({ text }: { text: string }) {
   return <p className="empty-text">{text}</p>
+}
+
+function missingRecommendationText(response: SearchResponse, startupId: string): string {
+  const errorNodes = new Set(response.errors.map((error) => error.node))
+  const context = response.nvidia_contexts.find((item) => item.startup_id === startupId)
+  if (errorNodes.has('evidence_validator')) {
+    return 'A validação de evidências ficou indisponível e não liberou dados suficientes para recomendar.'
+  }
+  if (errorNodes.has('recommendation')) {
+    return 'O agente de recomendação ficou indisponível ou não produziu uma saída válida.'
+  }
+  if (!context || context.sufficiency.status !== 'sufficient') {
+    return 'O contexto NVIDIA recuperado não foi suficiente para sustentar uma recomendação.'
+  }
+  if (response.warnings.includes('recommendation_no_identified_need')) {
+    return 'Nenhuma necessidade técnica validada foi identificada para relacionar a uma tecnologia NVIDIA.'
+  }
+  if (response.warnings.includes('recommendation_no_compatible_match')) {
+    return 'Nenhuma tecnologia recuperada apresentou correspondência validada com as necessidades identificadas.'
+  }
+  return 'Nenhuma recomendação rastreável foi produzida para esta startup.'
+}
+
+function missingBriefingText(response: SearchResponse, startupId: string): string {
+  if (response.errors.some((error) => error.node === 'briefing')) {
+    return 'O agente de briefing ficou indisponível ou não produziu uma saída válida.'
+  }
+  if (!response.recommendations.some((item) => item.startup_id === startupId)) {
+    return 'O briefing depende de pelo menos uma recomendação NVIDIA válida para esta startup.'
+  }
+  return 'O briefing executivo não pôde ser produzido para esta startup.'
 }
